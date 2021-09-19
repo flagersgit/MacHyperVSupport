@@ -30,6 +30,8 @@ private:
   
   void handleInterrupt(OSObject *owner, IOInterruptEventSource *sender, int count);
   
+  bool negotiateProtocol(HyperVPCIProtocolVersion protocolVersion);
+  
 public:
   //
   // IOService overrides.

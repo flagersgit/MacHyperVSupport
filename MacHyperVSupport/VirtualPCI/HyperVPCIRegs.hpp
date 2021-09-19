@@ -8,8 +8,6 @@
 #ifndef HyperVPCIRegs_h
 #define HyperVPCIRegs_h
 
-#include <stdint.h>
-
 /*
  * Protocol versions. The low word is the minor version, the high word the
  * major version.
@@ -69,11 +67,78 @@ typedef enum : UInt32 {
 
 typedef union __attribute__((packed)) {
   struct {
-    UInt16 MinorVersion;
-    UInt16 MajorVersion;
-  } Parts;
-  UInt32 Version;
+    UInt16 minorVersion;
+    UInt16 majorVersion;
+  } parts;
+  UInt32 version;
 } HyperVPCIVersion;
+
+/*
+ * Function numbers are 8-bits wide on Express, as interpreted through ARI,
+ * which is all this driver does.  This representation is the one used in
+ * Windows, which is what is expected when sending this back and forth with
+ * the Hyper-V parent partition.
+ */
+typedef union __attribute__((packed)) {
+  struct {
+    UInt32  dev:5;
+    UInt32  func:3;
+    UInt32  reserved:24;
+  } bits;
+  UInt32 slot;
+} HyperVPCIWindowsSlotEncoding;
+
+/*
+ * A generic message format for virtual PCI.
+ * Specific message formats are defined later in the file.
+ */
+
+typedef struct __attribute__((packed)) {
+  UInt32 type;
+} HyperVPCIMessage;
+
+typedef struct __attribute__((packed)) {
+  HyperVPCIMessage messageType;
+  HyperVPCIWindowsSlotEncoding winSlot;
+} HyperVPCIChildMessage;
+
+typedef struct __attribute__((packed)) {
+  VMBusPacketHeader hdr;
+  HyperVPCIMessage messageType;
+} HyperVPCIIncomingMessage;
+
+typedef struct __attribute__((packed)) {
+  VMBusPacketHeader hdr;
+  SInt32 status;      /* negative values are failures */
+} HyperVPCIResponse;
+
+typedef struct __attribute__((packed)) {
+  void (*completion_func)(void *context, HyperVPCIResponse *resp, int resp_packet_size);
+  
+  void *compl_ctxt;
+
+  HyperVPCIMessage message[];
+} HyperVPCIPacket;
+
+
+/*
+ * Specific message types supporting the PCI protocol
+ */
+
+/*
+ * Version negotiation message. Sent from the guest to the host.
+ * The guest is free to try different versions until the host
+ * accepts the version.
+ *
+ * pci_version: The protocol version requested.
+ * is_last_attempt: If TRUE, this is the last version guest will request.
+ * reservedz: Reserved field, set to zero.
+ */
+
+typedef struct __attribute__((packed)) {
+  HyperVPCIMessage messageType;
+  UInt32 protocolVersion;
+} HyperVPCIVersionRequest;
 
 #define kHyperVPCIRingBufferSize (4 * PAGE_SIZE)
 

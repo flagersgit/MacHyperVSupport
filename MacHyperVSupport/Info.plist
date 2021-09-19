@@ -116,7 +116,7 @@
 			<key>IOPropertyMatch</key>
 			<dict>
 				<key>HVType</key>
-				<string>44C4F61D-4444-4400-9D52-802E27EDE19F</string>
+				<string>44c4f61d-4444-4400-9d52-802e27ede19f</string>
 			</dict>
 			<key>IOProviderClass</key>
 			<string>HyperVVMBusDevice</string>

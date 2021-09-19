@@ -41,6 +41,8 @@ bool HyperVPCI::start(IOService *provider) {
     super::stop(provider);
     return false;
   }
+    
+  negotiateProtocol(kHyperVPCIProtocolVersion11);
   
   SYSLOG("Initialized Hyper-V Synthetic PCI Bus");
   return true;
