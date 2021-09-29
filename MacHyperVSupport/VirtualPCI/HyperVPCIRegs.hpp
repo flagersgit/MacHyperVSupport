@@ -112,10 +112,10 @@ typedef struct __attribute__((packed)) {
   SInt32 status;      /* negative values are failures */
 } HyperVPCIResponse;
 
-typedef struct __attribute__((packed)) {
-  void (*completion_func)(void *context, HyperVPCIResponse *resp, int resp_packet_size);
-  
-  void *compl_ctxt;
+typedef struct {
+  void (*completionFunc)(void *ctx __unused, HyperVPCIResponse *response,
+                         int responsePacketSize);
+  void *completionCtx __unused;
 
   HyperVPCIMessage message[];
 } HyperVPCIPacket;
