@@ -31,6 +31,8 @@ private:
   void handleInterrupt(OSObject *owner, IOInterruptEventSource *sender, int count);
   
   IOReturn negotiateProtocol(HyperVPCIProtocolVersion version);
+  
+  static void genericCompletion(void *ctx, HyperVPCIResponse *response, int responsePacketSize);
     
 public:
   //

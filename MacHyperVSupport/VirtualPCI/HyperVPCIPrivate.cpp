@@ -20,17 +20,21 @@ void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender,
 
   while (true) {
     if (!hvDevice->nextPacketAvailable(&type, &headersize, &totalsize)) {
+      DBGLOG("Last packet");
       break;
     }
     
     UInt8 *buf = (UInt8*)IOMalloc(totalsize);
+    DBGLOG("Reading packet to buffer");
     hvDevice->readRawPacket((void*)buf, totalsize);
     
     switch (type) {
       case kVMBusPacketTypeDataInband:
+        DBGLOG("Packet type: inband");
         break;
       
       case kVMBusPacketTypeCompletion:
+        DBGLOG("Packet type: completion");
         if (hvDevice->getPendingTransaction(((VMBusPacketHeader*)buf)->transactionId, &responseBuffer, &responseLength)) {
           memcpy(responseBuffer, (UInt8*)buf + headersize, responseLength);
           hvDevice->wakeTransaction(((VMBusPacketHeader*)buf)->transactionId);
@@ -55,18 +59,32 @@ IOReturn HyperVPCI::negotiateProtocol(HyperVPCIProtocolVersion version) {
   
   HyperVPCIVersionRequest *versionRequest;
   HyperVPCIPacket *packet;
+  HyperVPCICompletion *completionPacket;
   
   packet = (HyperVPCIPacket*)IOMalloc(sizeof(*packet) + sizeof(*versionRequest));
   if (!packet){ return kIOReturnNoMemory; }
   
+  packet->completionFunc = HyperVPCI::genericCompletion;
+  packet->completionCtx = &completionPacket;
+  
   versionRequest = (HyperVPCIVersionRequest*)&packet->message;
   versionRequest->messageType.type = kHyperVPCIMessageQueryProtocolVersion;
-  
   versionRequest->protocolVersion = version;
+  
   ret = hvDevice->writeInbandPacketWithTransactionId(versionRequest, sizeof(HyperVPCIVersionRequest), (UInt64)packet, true);
   if (ret != kIOReturnSuccess) {
     SYSLOG("HyperVPCI failed to request version");
   };
   
-  return true;
+  return ret;
+};
+
+void HyperVPCI::genericCompletion(void *ctx, HyperVPCIResponse *response, int responsePacketSize) {
+  HyperVPCICompletion* completionPacket = (HyperVPCICompletion*)ctx;
+  
+  if (responsePacketSize >= (offsetof(HyperVPCIResponse, status)+sizeof(response->status))) {
+    completionPacket->status = response->status;
+  } else {
+    completionPacket->status = -1;
+  }
 };

@@ -8,6 +8,8 @@
 #ifndef HyperVPCIRegs_h
 #define HyperVPCIRegs_h
 
+#include "HyperVPCI.hpp"
+
 /*
  * Protocol versions. The low word is the minor version, the high word the
  * major version.
@@ -113,12 +115,16 @@ typedef struct __attribute__((packed)) {
 } HyperVPCIResponse;
 
 typedef struct {
-  void (*completionFunc)(void *ctx __unused, HyperVPCIResponse *response,
+  void (*completionFunc)(void *ctx, HyperVPCIResponse *response,
                          int responsePacketSize);
-  void *completionCtx __unused;
+  void *completionCtx;
 
   HyperVPCIMessage message[];
 } HyperVPCIPacket;
+
+typedef struct {
+  SInt32 status;
+} HyperVPCICompletion;
 
 
 /*
