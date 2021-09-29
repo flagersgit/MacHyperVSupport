@@ -53,7 +53,7 @@ private:
   UInt64                        vmbusMaxAutoTransId = UINT64_MAX;
   IOLock                        *vmbusTransLock;
   
-  bool                    debugPackets = false;
+  bool                    debugPackets = true;
 
   bool setupCommandGate();
   void teardownCommandGate();
