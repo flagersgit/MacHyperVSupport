@@ -14,6 +14,7 @@ void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender,
   UInt32 totalsize;
   
   HyperVPCIPacket *completionPacket;
+  HyperVPCIIncomingMessage *newMessage;
 
   void *responseBuffer;
   UInt32 responseLength;
@@ -31,6 +32,16 @@ void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender,
     switch (type) {
       case kVMBusPacketTypeDataInband:
         DBGLOG("Packet type: inband");
+        if (hvDevice->getPendingTransaction(((VMBusPacketHeader*)buf)->transactionId, &responseBuffer, &responseLength)) {
+          memcpy(responseBuffer, (UInt8*)buf + headersize, responseLength);
+          hvDevice->wakeTransaction(((VMBusPacketHeader*)buf)->transactionId);
+        } else {
+          newMessage = (HyperVPCIIncomingMessage*)responseBuffer;
+          switch (newMessage->messageType.type) {
+            case kHyperVPCIMessageBusRelations:
+              
+          }
+        }
         break;
       
       case kVMBusPacketTypeCompletion:
@@ -87,4 +98,18 @@ void HyperVPCI::genericCompletion(void *ctx, HyperVPCIResponse *response, int re
   } else {
     completionPacket->status = -1;
   }
+};
+
+IOReturn HyperVPCI::queryRelations() {
+  IOReturn ret;
+  HyperVPCIMessage message;
+  
+  message.type = kHyperVPCIMessageQueryBusRelations;
+  
+  ret = hvDevice->writeInbandPacket(&message, sizeof(message), true);
+  if (ret != kIOReturnSuccess) {
+    SYSLOG("HyperVPCI failed to write query relations packet");
+  };
+  
+  return ret;
 };

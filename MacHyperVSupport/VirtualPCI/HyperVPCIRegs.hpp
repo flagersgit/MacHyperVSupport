@@ -146,6 +146,23 @@ typedef struct __attribute__((packed)) {
   UInt32 protocolVersion;
 } HyperVPCIVersionRequest;
 
+/*
+ * Bus D0 Entry.  This is sent from the guest to the host when the virtual
+ * bus (PCI Express port) is ready for action.
+ */
+
+typedef struct __attribute__((packed)) {
+  HyperVPCIMessage messagetype;
+  UInt32 reserved;
+  UInt64 mmioBase;
+} HyperVPCIBusD0Entry;
+
+typedef struct __attribute__((packed)) {
+  HyperVPCIIncomingMessage incoming;
+  UInt32 deviceCount;
+  struct pci_function_description func[];
+} HyperVPCIBusRelations;
+
 #define kHyperVPCIRingBufferSize (4 * PAGE_SIZE)
 
 #endif /* HyperVPCIRegs_h */
