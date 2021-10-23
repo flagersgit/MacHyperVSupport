@@ -8,6 +8,7 @@
 #include "HyperVPCI.hpp"
 
 #include <IOKit/acpi/IOACPIPlatformDevice.h>
+#include <IOKit/acpi/IOACPITypes.h>
 
 typedef struct __attribute__((packed)) {
   UInt64 type;
@@ -66,24 +67,26 @@ bool HyperVPCI::start(IOService *provider) {
 
 }
 
-//bool HyperVPCI::configure(IOService *provider) {
-//  //
-//  // Add memory ranges from ACPI.
-//  //
-//  OSData *acpiAddressSpaces = OSDynamicCast(OSData, provider->getProperty("acpi-address-spaces"));
-//  if (acpiAddressSpaces != NULL) {
-//    AppleACPIRange *acpiRanges = (AppleACPIRange*) acpiAddressSpaces->getBytesNoCopy();
-//    UInt32 acpiRangeCount = acpiAddressSpaces->getLength() / sizeof (AppleACPIRange);
-//
-//    for (int i = 0; i < acpiRangeCount; i++) {
-//      DBGLOG("type %u, min %llX, max %llX, len %llX", acpiRanges[i].type, acpiRanges[i].min, acpiRanges[i].max, acpiRanges[i].length);
-//      if (acpiRanges[i].type == 1) {
-//        addBridgeIORange(acpiRanges[i].min, acpiRanges[i].length);
-//      } else if (acpiRanges[i].type == 0) {
-//        addBridgeMemoryRange(acpiRanges[i].min, acpiRanges[i].length, true);
-//      }
-//    }
-//  }
-//
-//  return super::configure(provider);
-//}
+bool HyperVPCI::configure(IOService *provider) {
+  //
+  // Add memory ranges from ACPI.
+  //
+  IORegistryEntry* VMOD = IORegistryEntry::fromPath("/VMOD", gIOACPIPlane);
+  OSData *acpiAddressSpaces = OSDynamicCast(OSData, VMOD->getProperty("acpi-address-spaces"));
+  if (acpiAddressSpaces != NULL) {
+    AppleACPIRange *acpiRanges = (AppleACPIRange*) acpiAddressSpaces->getBytesNoCopy();
+    UInt32 acpiRangeCount = acpiAddressSpaces->getLength() / sizeof (AppleACPIRange);
+    
+    for (int i = 0; i < acpiRangeCount; i++) {
+      DBGLOG("type %u, min %llX, max %llX, len %llX", acpiRanges[i].type, acpiRanges[i].min, acpiRanges[i].max, acpiRanges[i].length);
+      if (acpiRanges[i].type == 1) {
+        addBridgeIORange(acpiRanges[i].min, acpiRanges[i].length);
+      } else if (acpiRanges[i].type == 0) {
+        addBridgeMemoryRange(acpiRanges[i].min, acpiRanges[i].length, true);
+      }
+    }
+  };
+  VMOD->release();
+  
+  return super::configure(provider);
+}

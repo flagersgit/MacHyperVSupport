@@ -91,6 +91,21 @@ typedef union __attribute__((packed)) {
 } HyperVPCIWindowsSlotEncoding;
 
 /*
+ * Pretty much as defined in the PCI Specifications.
+ */
+typedef struct __attribute__((packed)) {
+  UInt16  venId;  /* vendor ID */
+  UInt16  devId;  /* device ID */
+  UInt8  rev;
+  UInt8  progIntf;
+  UInt8  subClass;
+  UInt8  baseClass;
+  UInt32  subsystemId;
+  HyperVPCIWindowsSlotEncoding winSlot;
+  UInt32  ser;  /* serial number */
+} HyperVPCIFunctionDescription;
+
+/*
  * A generic message format for virtual PCI.
  * Specific message formats are defined later in the file.
  */
@@ -160,7 +175,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   HyperVPCIIncomingMessage incoming;
   UInt32 deviceCount;
-  struct pci_function_description func[];
+  HyperVPCIFunctionDescription func[];
 } HyperVPCIBusRelations;
 
 #define kHyperVPCIRingBufferSize (4 * PAGE_SIZE)

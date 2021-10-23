@@ -6,6 +6,7 @@
 //
 
 #include "HyperVPCI.hpp"
+//#include "HyperVPCIHelper.h"
 
 void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender, int count) {
   DBGLOG("Interrupt");
@@ -15,6 +16,8 @@ void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender,
   
   HyperVPCIPacket *completionPacket;
   HyperVPCIIncomingMessage *newMessage;
+  
+  HyperVPCIBusRelations *busRelations;
 
   void *responseBuffer;
   UInt32 responseLength;
@@ -39,7 +42,11 @@ void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender,
           newMessage = (HyperVPCIIncomingMessage*)responseBuffer;
           switch (newMessage->messageType.type) {
             case kHyperVPCIMessageBusRelations:
-              
+              busRelations = (HyperVPCIBusRelations*)buf;
+              if (responseLength < offsetof(HyperVPCIBusRelations, func) + (sizeof(HyperVPCIFunctionDescription) * (busRelations->deviceCount))) {
+                  DBGLOG("bus relations too small");
+                  break;
+              }
           }
         }
         break;
@@ -57,6 +64,7 @@ void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender,
         break;
 
       default:
+        SYSLOG("Unhandled packet type: %d, tid %llx len %d", type, ((VMBusPacketHeader*)buf)->transactionId, responseLength);
         break;
     }
     
