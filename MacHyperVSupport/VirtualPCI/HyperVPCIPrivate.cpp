@@ -8,7 +8,7 @@
 #include "HyperVPCI.hpp"
 //#include "HyperVPCIHelper.h"
 
-void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender, int count) {
+void HyperVPCI::onChannelCallback(OSObject *owner, IOInterruptEventSource *sender, int count) {
   DBGLOG("Interrupt");
   VMBusPacketType type;
   UInt32 headersize;
@@ -20,7 +20,7 @@ void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender,
   HyperVPCIBusRelations *busRelations;
 
   void *responseBuffer;
-  UInt32 responseLength;
+  UInt32 responseLength = 0;
 
   while (true) {
     if (!hvDevice->nextPacketAvailable(&type, &headersize, &totalsize)) {
