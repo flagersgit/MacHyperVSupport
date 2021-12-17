@@ -83,7 +83,7 @@ IOReturn HyperVPCI::negotiateProtocol() {
   
   HyperVPCIVersionRequest *versionRequest;
   HyperVPCIPacket *packet;
-  HyperVPCICompletion *completionPacket;
+  HyperVPCICompletion completionPacket;
   
   packet = (HyperVPCIPacket*)IOMalloc(sizeof(HyperVPCIPacket) + sizeof(HyperVPCIVersionRequest));
   if (!packet){ return kIOReturnNoMemory; }
@@ -102,17 +102,17 @@ IOReturn HyperVPCI::negotiateProtocol() {
     SYSLOG("failed to request version: %d", versionRequest->protocolVersion);
   };
   
-  if (completionPacket->status >= 0) {
+  if (completionPacket.status >= 0) {
     protocolVersion = (HyperVPCIProtocolVersion)versionRequest->protocolVersion;
     DBGLOG("using version: %d", protocolVersion);
   }
   
-  if (completionPacket->status == kStatusRevisionMismatch) {
+  if (completionPacket.status == kStatusRevisionMismatch) {
     DBGLOG("unsupported protocol version (%d), attempting older version", versionRequest->protocolVersion);
   }
   
-  if (completionPacket->status != kStatusRevisionMismatch) {
-    SYSLOG("failed version request: %#x", completionPacket->status);
+  if (completionPacket.status != kStatusRevisionMismatch) {
+    SYSLOG("failed version request: %#x", completionPacket.status);
   }
   
   IOFree(packet, sizeof(HyperVPCIPacket) + sizeof(HyperVPCIVersionRequest));
