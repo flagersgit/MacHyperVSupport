@@ -13,10 +13,6 @@
 OSDefineMetaClassAndStructors(HyperVPCI, super);
 
 bool HyperVPCI::start(IOService *provider) {
-  if (!super::start(provider)) {
-    return false;
-  }
-
   DBGLOG("Initializing Hyper-V Synthetic PCI Bus");
   
   //
@@ -67,10 +63,13 @@ bool HyperVPCI::start(IOService *provider) {
     return false;
   }
   
+  if (!super::start(provider)) {
+      SYSLOG("Hyper-V Synthetic PCI Bus failed to initialize");
+      return false;
+    }
   
   SYSLOG("Initialized Hyper-V Synthetic PCI Bus");
   return true;
-
 }
 
 bool HyperVPCI::configure(IOService *provider) {
