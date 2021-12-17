@@ -435,9 +435,9 @@
 		811FB7A926F6708200145C9B /* VirtualPCI */ = {
 			isa = PBXGroup;
 			children = (
-				811FB7AA26F6708200145C9B /* HyperVPCIRegs.hpp */,
 				811FB7AB26F6708200145C9B /* HyperVPCI.cpp */,
 				811FB7AC26F6708200145C9B /* HyperVPCI.hpp */,
+				811FB7AA26F6708200145C9B /* HyperVPCIRegs.hpp */,
 				811FB7AD26F6708200145C9B /* HyperVPCIPrivate.cpp */,
 			);
 			path = VirtualPCI;
