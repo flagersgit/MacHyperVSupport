@@ -10,9 +10,11 @@
 
 #include "HyperVPCI.hpp"
 
+#include <IOKit/pci/IOPCIBridge.h>
+
 /*
- * Protocol versions. The low word is the minor version, the high word the
- * major version.
+ * Protocol versions. The low word is the minor version and the high word
+ * is the major version.
  */
 
 #define HyperVPCIMakeVersion(major, minor) ((UInt32)(((major) << 16) | (minor)))
@@ -25,6 +27,12 @@ typedef enum : UInt32 {
   kHyperVPCIProtocolVersion13 = HyperVPCIMakeVersion(1, 3),    /* Vibranium */
   kHyperVPCIProtocolVersion14 = HyperVPCIMakeVersion(1, 4)     /* Iron */
 } HyperVPCIProtocolVersion;
+
+#define PCI_CONFIG_MMIO_LENGTH  0x2000
+#define CFG_PAGE_OFFSET 0x1000
+#define CFG_PAGE_SIZE (PCI_CONFIG_MMIO_LENGTH - CFG_PAGE_OFFSET)
+
+#define kStatusRevisionMismatch 0xC0000059
 
 /*
  * Message Types
@@ -137,28 +145,24 @@ typedef struct {
   HyperVPCIMessage message[];
 } HyperVPCIPacket;
 
-typedef struct {
-  SInt32 status;
-} HyperVPCICompletion;
-
 
 /*
  * Specific message types supporting the PCI protocol
  */
 
 /*
- * Version negotiation message. Sent from the guest to the host.
- * The guest is free to try different versions until the host
- * accepts the version.
+ * Version negotiation message.
  *
- * pci_version: The protocol version requested.
- * is_last_attempt: If TRUE, this is the last version guest will request.
+ * protocolVersion: The protocol version requested.
+ * isLastAttempt: If TRUE, this is the last version guest will request.
  * reservedz: Reserved field, set to zero.
  */
 
 typedef struct __attribute__((packed)) {
   HyperVPCIMessage messageType;
   UInt32 protocolVersion;
+  UInt32 isLastAttempt:1;
+  UInt32 reservedz:31;
 } HyperVPCIVersionRequest;
 
 /*
@@ -167,7 +171,7 @@ typedef struct __attribute__((packed)) {
  */
 
 typedef struct __attribute__((packed)) {
-  HyperVPCIMessage messagetype;
+  HyperVPCIMessage messageType;
   UInt32 reserved;
   UInt64 mmioBase;
 } HyperVPCIBusD0Entry;
@@ -175,8 +179,38 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   HyperVPCIIncomingMessage incoming;
   UInt32 deviceCount;
-  HyperVPCIFunctionDescription func[];
+  HyperVPCIFunctionDescription funcDesc[];
 } HyperVPCIBusRelations;
+
+#define kHyperVPCIMaxNumBARs  6
+
+typedef struct __attribute__((packed)) {
+  HyperVPCIResponse respHdr;
+  UInt32 probedBar[kHyperVPCIMaxNumBARs];
+} HyperVPCIQueryResourceRequirementsResponse;
+
+class HyperVPCIDevice : public OSObject {
+  friend class HyperVPCI;
+  
+private:
+  HyperVPCIFunctionDescription  funcDesc;
+  bool                          reportedMissing;
+
+  UInt32 probedBar[kHyperVPCIMaxNumBARs];
+  
+  //
+  // I/O Kit nub for PCI device.
+  //
+  IOPCIDevice                  *deviceNub;
+};
+
+typedef struct {
+  SInt32 status;
+} HyperVPCICompletion;
+
+typedef struct {
+  HyperVPCIDevice *hvPciDevice;
+} HyperVPCIQueryResourceRequirementsCompletion;
 
 #define kHyperVPCIRingBufferSize (4 * PAGE_SIZE)
 

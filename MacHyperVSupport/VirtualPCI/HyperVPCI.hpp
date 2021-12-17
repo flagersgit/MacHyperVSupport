@@ -26,16 +26,38 @@ private:
   //
   // Parent VMBus device.
   //
-  HyperVVMBusDevice       *hvDevice;
-  IOInterruptEventSource  *interruptSource;
+  HyperVVMBusDevice        *hvDevice;
+  IOInterruptEventSource   *interruptSource;
   
-  void handleInterrupt(OSObject *owner, IOInterruptEventSource *sender, int count);
+  HyperVPCIProtocolVersion  protocolVersion;
   
-  IOReturn negotiateProtocol(HyperVPCIProtocolVersion version);
+  //
+  // OSArray for tracking PCI devices under the synthetic bus.
+  // Contains: HyperVPCIDevice
+  //
+  OSArray                  *hvPciDevices;
   
+  IODeviceMemory           *ioMemory;
+  
+  void onChannelCallback(OSObject *owner, IOInterruptEventSource *sender, int count);
+
+  //
+  // Completion functions
+  //
   static void genericCompletion(void *ctx, HyperVPCIResponse *response, int responsePacketSize);
+  static void queryResourceRequirements(void *ctx, HyperVPCIResponse *response, int responsePacketSize);
+  
+  IOReturn negotiateProtocol();
   
   IOReturn queryRelations();
+  
+  void pciDevicesPresent(HyperVPCIBusRelations *busRelations);
+  
+  HyperVPCIDevice* registerChildDevice(HyperVPCIFunctionDescription *funcDesc);
+  void destroyChildDevice(HyperVPCIDevice *hvPciDevice);
+  
+  IOReturn enterD0();
+  
     
 public:
   //
@@ -47,7 +69,11 @@ public:
   // IOPCIBridge overrides.
   //
   virtual bool configure(IOService *provider) APPLE_KEXT_OVERRIDE;
-  IODeviceMemory *ioDeviceMemory() APPLE_KEXT_OVERRIDE { return NULL; }
+  virtual void probeBus(IOService *provider, UInt8 busNum) APPLE_KEXT_OVERRIDE;
+  
+  virtual IODeviceMemory* ioDeviceMemory(void) APPLE_KEXT_OVERRIDE {
+    return ioMemory;
+  };
 
   UInt32 configRead32(IOPCIAddressSpace space, UInt8 offset) APPLE_KEXT_OVERRIDE;
   void configWrite32(IOPCIAddressSpace space, UInt8 offset, UInt32 data) APPLE_KEXT_OVERRIDE;
