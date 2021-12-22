@@ -13,13 +13,20 @@
 
 #include <IOKit/pci/IOPCIBridge.h>
 
+#if IOPCIB_IMPL
 #define super IOPCIBridge
+#else
+#define super IOService
+#endif
 
 #define SYSLOG(str, ...) SYSLOG_PRINT("HyperVPCI", str, ## __VA_ARGS__)
 #define DBGLOG(str, ...) DBGLOG_PRINT("HyperVPCI", str, ## __VA_ARGS__)
 
-//class HyperVPCI : public IOPCIBridge {
+#if IOPCIB_IMPL
 class HyperVPCI : public IOPCIBridge {
+#else
+class HyperVPCI : public IOService {
+#endif
   OSDeclareDefaultStructors(HyperVPCI);
   
 private:
@@ -64,7 +71,8 @@ public:
   // IOService overrides.
   //
   virtual bool start(IOService *provider) APPLE_KEXT_OVERRIDE;
-  
+
+#if IOPCIB_IMPL
   //
   // IOPCIBridge overrides.
   //
@@ -75,17 +83,26 @@ public:
     return ioMemory;
   };
 
-  UInt32 configRead32(IOPCIAddressSpace space, UInt8 offset) APPLE_KEXT_OVERRIDE;
-  void configWrite32(IOPCIAddressSpace space, UInt8 offset, UInt32 data) APPLE_KEXT_OVERRIDE;
-  UInt16 configRead16(IOPCIAddressSpace space, UInt8 offset) APPLE_KEXT_OVERRIDE;
-  void configWrite16(IOPCIAddressSpace space, UInt8 offset, UInt16 data) APPLE_KEXT_OVERRIDE;
-  UInt8 configRead8(IOPCIAddressSpace space, UInt8 offset) APPLE_KEXT_OVERRIDE;
-  void configWrite8(IOPCIAddressSpace space, UInt8 offset, UInt8 data) APPLE_KEXT_OVERRIDE;
+  virtual UInt32 configRead32(IOPCIAddressSpace space, UInt8 offset) APPLE_KEXT_OVERRIDE;
+  virtual void configWrite32(IOPCIAddressSpace space, UInt8 offset, UInt32 data) APPLE_KEXT_OVERRIDE;
+  virtual UInt16 configRead16(IOPCIAddressSpace space, UInt8 offset) APPLE_KEXT_OVERRIDE;
+  virtual void configWrite16(IOPCIAddressSpace space, UInt8 offset, UInt16 data) APPLE_KEXT_OVERRIDE;
+  virtual UInt8 configRead8(IOPCIAddressSpace space, UInt8 offset) APPLE_KEXT_OVERRIDE;
+  virtual void configWrite8(IOPCIAddressSpace space, UInt8 offset, UInt8 data) APPLE_KEXT_OVERRIDE;
 
-  IOPCIAddressSpace getBridgeSpace() APPLE_KEXT_OVERRIDE {
+  virtual IOPCIAddressSpace getBridgeSpace() APPLE_KEXT_OVERRIDE {
     IOPCIAddressSpace space = { 0 };
     return space;
   }
+  
+  virtual UInt8 firstBusNum() APPLE_KEXT_OVERRIDE {
+    return 0;
+  }
+  
+  virtual UInt8 lastBusNum() APPLE_KEXT_OVERRIDE {
+    return 0;
+  }
+#endif
 };
 
 #endif /* HyperVPCI_hpp */

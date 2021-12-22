@@ -14,6 +14,9 @@ OSDefineMetaClassAndStructors(HyperVPCI, super);
 
 bool HyperVPCI::start(IOService *provider) {
   DBGLOG("Initializing Hyper-V Synthetic PCI Bus");
+  if (!super::start(provider)) {
+    return false;
+  }
   
   //
   // Get parent VMBus device object.
@@ -25,7 +28,15 @@ bool HyperVPCI::start(IOService *provider) {
   }
   hvDevice->retain();
   
-  ioMemory = hvDevice->allocateMmio(0, PCI_CONFIG_MMIO_LENGTH, PAGE_SIZE, false);
+  IODeviceMemory *devMem = hvDevice->allocateMmio(0, PCI_CONFIG_MMIO_LENGTH, PAGE_SIZE, false);
+  OSArray *devMemArr = OSArray::withCapacity(1);
+  devMemArr->setObject(0, devMem);
+  
+  provider->setDeviceMemory(devMemArr);
+  devMem->release();
+  devMemArr->release();
+  
+  ioMemory = (IODeviceMemory *)devMemArr->getObject(0);
   if (ioMemory == NULL) {
     SYSLOG("could not allocate memory for bridge");
     super::stop(provider);
@@ -63,15 +74,12 @@ bool HyperVPCI::start(IOService *provider) {
     return false;
   }
   
-  if (!super::start(provider)) {
-      SYSLOG("Hyper-V Synthetic PCI Bus failed to initialize");
-      return false;
-    }
-  
   SYSLOG("Initialized Hyper-V Synthetic PCI Bus");
   return true;
 }
 
+#if IOPCIB_IMPL
 bool HyperVPCI::configure(IOService *provider) {
   return super::configure(provider);
 }
+#endif

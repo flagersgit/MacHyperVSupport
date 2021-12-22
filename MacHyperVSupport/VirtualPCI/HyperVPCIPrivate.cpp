@@ -38,9 +38,13 @@ void HyperVPCI::onChannelCallback(OSObject *owner, IOInterruptEventSource *sende
           memcpy(responseBuffer, (UInt8*)buf + headersize, responseLength);
           hvDevice->wakeTransaction(((VMBusPacketHeader*)buf)->transactionId);
         } else {
+          DBGLOG("here");
           completionPacket = (HyperVPCIPacket*)((VMBusPacketHeader*)buf)->transactionId;
+          DBGLOG("there");
           responseBuffer = (HyperVPCIResponse*)buf;
+          DBGLOG("everywhere");
           completionPacket->completionFunc(completionPacket->completionCtx, (HyperVPCIResponse*)responseBuffer, responseLength);
+          DBGLOG("but not here");
         };
         break;
       
@@ -79,25 +83,27 @@ void HyperVPCI::onChannelCallback(OSObject *owner, IOInterruptEventSource *sende
 
 
 IOReturn HyperVPCI::negotiateProtocol() {
+  DBGLOG("called");
   IOReturn ret;
   
   HyperVPCIVersionRequest *versionRequest;
-  HyperVPCIPacket *packet;
   HyperVPCICompletion completionPacket;
   
-  packet = (HyperVPCIPacket*)IOMalloc(sizeof(HyperVPCIPacket) + sizeof(HyperVPCIVersionRequest));
-  if (!packet){ return kIOReturnNoMemory; }
+  struct {
+    HyperVPCIPacket packet;
+    UInt8 buffer[sizeof(HyperVPCIVersionRequest)];
+  } ctx;
   
-  packet->completionFunc = genericCompletion;
-  packet->completionCtx = &completionPacket;
+  ctx.packet.completionFunc = genericCompletion;
+  ctx.packet.completionCtx = &completionPacket;
   
-  versionRequest = (HyperVPCIVersionRequest*)&packet->message;
+  versionRequest = (HyperVPCIVersionRequest*)&ctx.packet.message;
   versionRequest->messageType.type = kHyperVPCIMessageQueryProtocolVersion;
   versionRequest->protocolVersion = kHyperVPCIProtocolVersion11;
   versionRequest->isLastAttempt = 1;
   
   DBGLOG("sending packet requesting version: %d", versionRequest->protocolVersion);
-  ret = hvDevice->writeInbandPacketWithTransactionId(versionRequest, sizeof(*versionRequest), (UInt64)packet, true);
+  ret = hvDevice->writeInbandPacketWithTransactionId(versionRequest, sizeof(*versionRequest), (UInt64)&ctx.packet, true);
   if (ret != kIOReturnSuccess) {
     SYSLOG("failed to request version: %d", versionRequest->protocolVersion);
   };
@@ -114,13 +120,13 @@ IOReturn HyperVPCI::negotiateProtocol() {
   if (completionPacket.status != kStatusRevisionMismatch) {
     SYSLOG("failed version request: %#x", completionPacket.status);
   }
-  
-  IOFree(packet, sizeof(HyperVPCIPacket) + sizeof(HyperVPCIVersionRequest));
+
   return ret;
 }
 
 
 void HyperVPCI::genericCompletion(void *ctx, HyperVPCIResponse *response, int responsePacketSize) {
+  DBGLOG("called");
   HyperVPCICompletion* completionPacket = (HyperVPCICompletion*)ctx;
   
   if (responsePacketSize >= (offsetof(HyperVPCIResponse, status)+sizeof(response->status))) {
@@ -131,6 +137,7 @@ void HyperVPCI::genericCompletion(void *ctx, HyperVPCIResponse *response, int re
 }
 
 void HyperVPCI::queryResourceRequirements(void *ctx, HyperVPCIResponse *response, int responsePacketSize) {
+  DBGLOG("called");
   HyperVPCIQueryResourceRequirementsCompletion* completionPacket = (HyperVPCIQueryResourceRequirementsCompletion*)ctx;
   HyperVPCIQueryResourceRequirementsResponse* queryResourceResponse = (HyperVPCIQueryResourceRequirementsResponse*)response;
   
@@ -145,6 +152,7 @@ void HyperVPCI::queryResourceRequirements(void *ctx, HyperVPCIResponse *response
 
 
 IOReturn HyperVPCI::queryRelations() {
+  DBGLOG("called");
   IOReturn ret;
   HyperVPCIMessage message;
   
@@ -160,6 +168,7 @@ IOReturn HyperVPCI::queryRelations() {
 
 
 void HyperVPCI::pciDevicesPresent(HyperVPCIBusRelations *busRelations) {
+  DBGLOG("called");
   OSCollectionIterator          *iterator;
   HyperVPCIDevice               *hvPciDevice;
   HyperVPCIFunctionDescription  *newFuncDesc;
@@ -210,39 +219,37 @@ void HyperVPCI::pciDevicesPresent(HyperVPCIBusRelations *busRelations) {
 }
 
 HyperVPCIDevice* HyperVPCI::registerChildDevice(HyperVPCIFunctionDescription *funcDesc) {
+  DBGLOG("called");
   // Allocate and initialize HyperVPCIDevice object.
   HyperVPCIDevice *hvPciDevice = OSTypeAlloc(HyperVPCIDevice);
   
   HyperVPCIChildMessage *resourceRequest;
-  HyperVPCIPacket *packet;
   HyperVPCIQueryResourceRequirementsCompletion *completionPacket;
   
-  packet = (HyperVPCIPacket*)IOMalloc(sizeof(HyperVPCIPacket) + sizeof(HyperVPCIChildMessage));
-  if (!packet) {
-    hvPciDevice->free();
-    return NULL;
-  }
+  struct {
+    HyperVPCIPacket packet;
+    UInt8 buffer[sizeof(HyperVPCIChildMessage)];
+  } ctx;
   
-  packet->completionFunc = HyperVPCI::genericCompletion;
-  packet->completionCtx = &completionPacket;
+  ctx.packet.completionFunc = HyperVPCI::genericCompletion;
+  ctx.packet.completionCtx = &completionPacket;
   
-  resourceRequest = (HyperVPCIChildMessage*)&packet->message;
+  resourceRequest = (HyperVPCIChildMessage*)&ctx.packet.message;
   resourceRequest->messageType.type = kHyperVPCIMessageQueryResourceRequirements;
   resourceRequest->winSlot.slot = funcDesc->winSlot.slot;
   
-  if (hvDevice->writeInbandPacketWithTransactionId(resourceRequest, sizeof(*resourceRequest), (UInt64)packet, true) != kIOReturnSuccess) {
+  if (hvDevice->writeInbandPacketWithTransactionId(resourceRequest, sizeof(*resourceRequest), (UInt64)&ctx.packet, true) != kIOReturnSuccess) {
     hvPciDevice->free();
     return NULL;
   }
   
   memcpy(&hvPciDevice->funcDesc, (void*)funcDesc, sizeof(*funcDesc));
 
-  hvPciDevice->free();
-  IOFree(packet, sizeof(HyperVPCIPacket) + sizeof(HyperVPCIChildMessage));
-  return NULL;
+  return hvPciDevice;
 }
 
 void HyperVPCI::destroyChildDevice(HyperVPCIDevice *hvPciDevice) {
+  DBGLOG("called");
   //
   // Notify IOPCIDevice nub of termination.
   //
@@ -257,30 +264,30 @@ void HyperVPCI::destroyChildDevice(HyperVPCIDevice *hvPciDevice) {
 }
 
 IOReturn HyperVPCI::enterD0() {
+  DBGLOG("called");
   IOReturn ret;
   
   HyperVPCIBusD0Entry *d0Entry;
-  HyperVPCIPacket *packet;
-  HyperVPCICompletion *completionPacket;
+  struct {
+    HyperVPCIPacket packet;
+    UInt8 buffer[sizeof(HyperVPCIBusD0Entry)];
+  } ctx;
+  HyperVPCICompletion completionPacket;
   
-  packet = (HyperVPCIPacket*)IOMalloc(sizeof(HyperVPCIPacket) + sizeof(HyperVPCIBusD0Entry));
-  if (!packet){ return kIOReturnNoMemory; }
+  ctx.packet.completionFunc = genericCompletion;
+  ctx.packet.completionCtx = &completionPacket;
   
-  packet->completionFunc = genericCompletion;
-  packet->completionCtx = &completionPacket;
-  
-  d0Entry = (HyperVPCIBusD0Entry*)&packet->message;
+  d0Entry = (HyperVPCIBusD0Entry*)&ctx.packet.message;
   memset(d0Entry, 0, sizeof(*d0Entry));
   d0Entry->messageType.type = kHyperVPCIMessageBusD0Entry;
   d0Entry->mmioBase = ioMemory->getPhysicalAddress();
   
-  ret = hvDevice->writeInbandPacketWithTransactionId(d0Entry, sizeof(*d0Entry), (UInt64)packet, true);
+  ret = hvDevice->writeInbandPacketWithTransactionId(d0Entry, sizeof(*d0Entry), (UInt64)&ctx.packet, true);
   
-  if (completionPacket->status < 0) {
+  if (completionPacket.status < 0) {
     SYSLOG("failed to enable D0 for bus");
     ret = kIOReturnError;
   }
   
-  IOFree(packet, sizeof(HyperVPCIPacket) + sizeof(HyperVPCIBusD0Entry));
   return ret;
 }
