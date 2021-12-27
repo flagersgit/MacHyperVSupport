@@ -7,32 +7,30 @@
 
 #include "HyperVPCI.hpp"
 
-void HyperVPCI::onChannelCallback(OSObject *owner, IOInterruptEventSource *sender, int count) {
-  DBGLOG("Interrupt");
+void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender, int count) {
   VMBusPacketType type;
   UInt32 headersize;
   UInt32 totalsize;
   
-  HyperVPCIPacket *completionPacket;
-  HyperVPCIIncomingMessage *newMessage;
-  
-  HyperVPCIBusRelations *busRelations;
-
   void *responseBuffer;
   UInt32 responseLength = 0;
-
+  
   while (true) {
     if (!hvDevice->nextPacketAvailable(&type, &headersize, &totalsize)) {
-      DBGLOG("Last packet");
+      DBGLOG("last packet; none available next.");
       break;
     }
     
-    UInt8 *buf = (UInt8*)IOMalloc(totalsize);
-    DBGLOG("Reading packet to buffer");
-    hvDevice->readRawPacket((void*)buf, totalsize);
+    DBGLOG("allocating buffer for packet");
+    void *buf = IOMalloc(totalsize);
+    DBGLOG("reading packet to buffer");
+    hvDevice->readRawPacket(buf, totalsize);
     
     switch (type) {
       case kVMBusPacketTypeCompletion:
+        HyperVPCIPacket *completionPacket;
+        HyperVPCIIncomingMessage *newMessage;
+
         DBGLOG("Packet type: completion");
         if (hvDevice->getPendingTransaction(((VMBusPacketHeader*)buf)->transactionId, &responseBuffer, &responseLength)) {
           memcpy(responseBuffer, (UInt8*)buf + headersize, responseLength);
@@ -57,6 +55,8 @@ void HyperVPCI::onChannelCallback(OSObject *owner, IOInterruptEventSource *sende
           newMessage = (HyperVPCIIncomingMessage*)responseBuffer;
           switch (newMessage->messageType.type) {
             case kHyperVPCIMessageBusRelations:
+              HyperVPCIBusRelations *busRelations;
+              
               busRelations = (HyperVPCIBusRelations*)buf;
               if (busRelations->deviceCount == 0)
                 break;
@@ -76,26 +76,24 @@ void HyperVPCI::onChannelCallback(OSObject *owner, IOInterruptEventSource *sende
         SYSLOG("Unhandled packet type: %d, tid %llx len %d", type, ((VMBusPacketHeader*)buf)->transactionId, responseLength);
         break;
     }
-    
-    IOFree(buf, totalsize);
   }
 }
-
 
 IOReturn HyperVPCI::negotiateProtocol() {
   DBGLOG("called");
   IOReturn ret;
   
   HyperVPCIVersionRequest *versionRequest;
-  HyperVPCICompletion completionPacket;
+  HyperVPCICompletion      completion;
   
   struct {
     HyperVPCIPacket packet;
     UInt8 buffer[sizeof(HyperVPCIVersionRequest)];
   } ctx;
   
+  completion.completion = Completion::create();
   ctx.packet.completionFunc = genericCompletion;
-  ctx.packet.completionCtx = &completionPacket;
+  ctx.packet.completionCtx = &completion;
   
   versionRequest = (HyperVPCIVersionRequest*)&ctx.packet.message;
   versionRequest->messageType.type = kHyperVPCIMessageQueryProtocolVersion;
@@ -104,68 +102,28 @@ IOReturn HyperVPCI::negotiateProtocol() {
   
   DBGLOG("sending packet requesting version: %d", versionRequest->protocolVersion);
   ret = hvDevice->writeInbandPacketWithTransactionId(versionRequest, sizeof(*versionRequest), (UInt64)&ctx.packet, true);
-  if (ret != kIOReturnSuccess) {
-    SYSLOG("failed to request version: %d", versionRequest->protocolVersion);
-  };
   
-  if (completionPacket.status >= 0) {
+  if (ret == kIOReturnSuccess) {
+    completion.completion->waitForCompletion();
+  } else {
+    SYSLOG("failed to request version: %d", versionRequest->protocolVersion);
+  }
+  
+  if (completion.status >= 0) {
     protocolVersion = (HyperVPCIProtocolVersion)versionRequest->protocolVersion;
     DBGLOG("using version: %d", protocolVersion);
   }
   
-  if (completionPacket.status == kStatusRevisionMismatch) {
+  if (completion.status == kStatusRevisionMismatch) {
     DBGLOG("unsupported protocol version (%d), attempting older version", versionRequest->protocolVersion);
   }
   
-  if (completionPacket.status != kStatusRevisionMismatch) {
-    SYSLOG("failed version request: %#x", completionPacket.status);
+  if (completion.status != kStatusRevisionMismatch) {
+    SYSLOG("failed version request: %#x", completion.status);
   }
-
-  return ret;
-}
-
-
-void HyperVPCI::genericCompletion(void *ctx, HyperVPCIResponse *response, int responsePacketSize) {
-  DBGLOG("called");
-  HyperVPCICompletion* completionPacket = (HyperVPCICompletion*)ctx;
-  
-  if (responsePacketSize >= (offsetof(HyperVPCIResponse, status)+sizeof(response->status))) {
-    completionPacket->status = response->status;
-  } else {
-    completionPacket->status = -1;
-  }
-}
-
-void HyperVPCI::queryResourceRequirements(void *ctx, HyperVPCIResponse *response, int responsePacketSize) {
-  DBGLOG("called");
-  HyperVPCIQueryResourceRequirementsCompletion* completionPacket = (HyperVPCIQueryResourceRequirementsCompletion*)ctx;
-  HyperVPCIQueryResourceRequirementsResponse* queryResourceResponse = (HyperVPCIQueryResourceRequirementsResponse*)response;
-  
-  if (queryResourceResponse->respHdr.status < 0) {
-    SYSLOG("failed to query resource requirements");
-  } else {
-    for (int i = 0; i < kHyperVPCIMaxNumBARs; i++) {
-      completionPacket->hvPciDevice->probedBar[i] = queryResourceResponse->probedBar[i];
-    }
-  }
-};
-
-
-IOReturn HyperVPCI::queryRelations() {
-  DBGLOG("called");
-  IOReturn ret;
-  HyperVPCIMessage message;
-  
-  message.type = kHyperVPCIMessageQueryBusRelations;
-  
-  ret = hvDevice->writeInbandPacket(&message, sizeof(message), false);
-  if (ret != kIOReturnSuccess) {
-    SYSLOG("failed to query relations");
-  };
   
   return ret;
 }
-
 
 void HyperVPCI::pciDevicesPresent(HyperVPCIBusRelations *busRelations) {
   DBGLOG("called");
@@ -218,27 +176,68 @@ void HyperVPCI::pciDevicesPresent(HyperVPCIBusRelations *busRelations) {
   return;
 }
 
+void HyperVPCI::genericCompletion(void *ctx, HyperVPCIResponse *response, int responsePacketSize) {
+  DBGLOG("called");
+  HyperVPCICompletion* completion = (HyperVPCICompletion*)ctx;
+  
+  if (responsePacketSize >= (offsetof(HyperVPCIResponse, status)+sizeof(response->status))) {
+    completion->status = response->status;
+  } else {
+    completion->status = -1;
+  }
+  
+  completion->completion->complete();
+}
+
+IOReturn HyperVPCI::queryRelations() {
+  DBGLOG("called");
+  IOReturn          ret;
+  HyperVPCIMessage  message;
+  IOLock           *lock;
+  
+  lock = IOLockAlloc();
+  if (lock == NULL) {
+    SYSLOG("failed to allocate lock for request");
+    return kIOReturnCannotLock;
+  };
+  
+  message.type = kHyperVPCIMessageQueryBusRelations;
+  
+  ret = hvDevice->writeInbandPacket(&message, sizeof(message), false);
+  if (ret != kIOReturnSuccess) {
+    SYSLOG("failed to send bus relations query");
+  };
+  
+  return ret;
+}
+
 HyperVPCIDevice* HyperVPCI::registerChildDevice(HyperVPCIFunctionDescription *funcDesc) {
   DBGLOG("called");
+  IOReturn ret;
+  
   // Allocate and initialize HyperVPCIDevice object.
   HyperVPCIDevice *hvPciDevice = OSTypeAlloc(HyperVPCIDevice);
   
   HyperVPCIChildMessage *resourceRequest;
-  HyperVPCIQueryResourceRequirementsCompletion *completionPacket;
+  HyperVPCIQueryResourceRequirementsCompletion completion;
   
   struct {
     HyperVPCIPacket packet;
     UInt8 buffer[sizeof(HyperVPCIChildMessage)];
   } ctx;
   
-  ctx.packet.completionFunc = HyperVPCI::genericCompletion;
-  ctx.packet.completionCtx = &completionPacket;
+  completion.completion = Completion::create();
+  ctx.packet.completionFunc = genericCompletion;
+  ctx.packet.completionCtx = &completion;
   
   resourceRequest = (HyperVPCIChildMessage*)&ctx.packet.message;
   resourceRequest->messageType.type = kHyperVPCIMessageQueryResourceRequirements;
   resourceRequest->winSlot.slot = funcDesc->winSlot.slot;
   
-  if (hvDevice->writeInbandPacketWithTransactionId(resourceRequest, sizeof(*resourceRequest), (UInt64)&ctx.packet, true) != kIOReturnSuccess) {
+  ret = hvDevice->writeInbandPacketWithTransactionId(resourceRequest, sizeof(*resourceRequest), (UInt64)&ctx.packet, true);
+  if (ret == kIOReturnSuccess) {
+    completion.completion->waitForCompletion();
+  } else {
     hvPciDevice->free();
     return NULL;
   }
@@ -272,10 +271,11 @@ IOReturn HyperVPCI::enterD0() {
     HyperVPCIPacket packet;
     UInt8 buffer[sizeof(HyperVPCIBusD0Entry)];
   } ctx;
-  HyperVPCICompletion completionPacket;
+  HyperVPCICompletion completion;
   
+  completion.completion = Completion::create();
   ctx.packet.completionFunc = genericCompletion;
-  ctx.packet.completionCtx = &completionPacket;
+  ctx.packet.completionCtx = &completion;
   
   d0Entry = (HyperVPCIBusD0Entry*)&ctx.packet.message;
   memset(d0Entry, 0, sizeof(*d0Entry));
@@ -283,8 +283,11 @@ IOReturn HyperVPCI::enterD0() {
   d0Entry->mmioBase = ioMemory->getPhysicalAddress();
   
   ret = hvDevice->writeInbandPacketWithTransactionId(d0Entry, sizeof(*d0Entry), (UInt64)&ctx.packet, true);
+  if (ret == kIOReturnSuccess) {
+    completion.completion->waitForCompletion();
+  }
   
-  if (completionPacket.status < 0) {
+  if (completion.status < 0) {
     SYSLOG("failed to enable D0 for bus");
     ret = kIOReturnError;
   }

@@ -9,6 +9,7 @@
 #define HyperVPCIRegs_h
 
 #include "HyperVPCI.hpp"
+#include "Completion.hpp"
 
 #include <IOKit/pci/IOPCIBridge.h>
 
@@ -137,14 +138,6 @@ typedef struct __attribute__((packed)) {
   SInt32 status;      /* negative values are failures */
 } HyperVPCIResponse;
 
-typedef struct {
-  void (*completionFunc)(void *ctx, HyperVPCIResponse *response,
-                         int responsePacketSize);
-  void *completionCtx;
-
-  HyperVPCIMessage message[];
-} HyperVPCIPacket;
-
 
 /*
  * Specific message types supporting the PCI protocol
@@ -189,26 +182,21 @@ typedef struct __attribute__((packed)) {
   UInt32 probedBar[kHyperVPCIMaxNumBARs];
 } HyperVPCIQueryResourceRequirementsResponse;
 
-class HyperVPCIDevice : public OSObject {
-  friend class HyperVPCI;
-  
-private:
-  HyperVPCIFunctionDescription  funcDesc;
-  bool                          reportedMissing;
-
-  UInt32 probedBar[kHyperVPCIMaxNumBARs];
-  
-  //
-  // I/O Kit nub for PCI device.
-  //
-  IOPCIDevice                  *deviceNub;
-};
-
 typedef struct {
+  Completion *completion;
   SInt32 status;
 } HyperVPCICompletion;
 
 typedef struct {
+  void (*completionFunc)(void*, HyperVPCIResponse *response, int responsePacketSize);
+  void *completionCtx;
+
+  HyperVPCIMessage message[];
+} HyperVPCIPacket;
+
+class HyperVPCIDevice;
+typedef struct {
+  Completion *completion;
   HyperVPCIDevice *hvPciDevice;
 } HyperVPCIQueryResourceRequirementsCompletion;
 

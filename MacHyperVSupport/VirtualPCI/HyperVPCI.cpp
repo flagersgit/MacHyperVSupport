@@ -47,7 +47,7 @@ bool HyperVPCI::start(IOService *provider) {
   // Configure interrupt.
   //
   interruptSource =
-    IOInterruptEventSource::interruptEventSource(this, OSMemberFunctionCast(IOInterruptEventAction, this, &HyperVPCI::onChannelCallback), provider, 0);
+    IOInterruptEventSource::interruptEventSource(this, OSMemberFunctionCast(IOInterruptEventAction, this, &HyperVPCI::handleInterrupt), provider, 0);
   getWorkLoop()->addEventSource(interruptSource);
   interruptSource->enable();
   
@@ -79,7 +79,7 @@ bool HyperVPCI::start(IOService *provider) {
 }
 
 #if IOPCIB_IMPL
-bool HyperVPCI::configure(IOService *provider) {
-  return super::configure(provider);
-}
+//bool HyperVPCI::configure(IOService *provider) {
+//  return super::configure(provider);
+//}
 #endif

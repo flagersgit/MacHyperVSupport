@@ -78,6 +78,8 @@
 		41F2E44C2666F37B00CE26CE /* HyperVPCIProvider.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 41F2E44A2666F37B00CE26CE /* HyperVPCIProvider.hpp */; };
 		41F2E45C26683B2C00CE26CE /* HyperVPCIRoot.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41F2E45A26683B2B00CE26CE /* HyperVPCIRoot.cpp */; };
 		41F2E45D26683B2C00CE26CE /* HyperVPCIRoot.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 41F2E45B26683B2C00CE26CE /* HyperVPCIRoot.hpp */; };
+		810098632779947C00076D10 /* Completion.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 810098612779947C00076D10 /* Completion.hpp */; };
+		81009865277996B500076D10 /* Completion.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 81009864277996B500076D10 /* Completion.cpp */; };
 		811FB7AE26F6708900145C9B /* HyperVPCI.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 811FB7AB26F6708200145C9B /* HyperVPCI.cpp */; };
 		811FB7B026F6708B00145C9B /* HyperVPCI.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 811FB7AC26F6708200145C9B /* HyperVPCI.hpp */; };
 		811FB7B226F6709000145C9B /* HyperVPCIPrivate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 811FB7AD26F6708200145C9B /* HyperVPCIPrivate.cpp */; };
@@ -173,6 +175,8 @@
 		41F2E44A2666F37B00CE26CE /* HyperVPCIProvider.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = HyperVPCIProvider.hpp; sourceTree = "<group>"; };
 		41F2E45A26683B2B00CE26CE /* HyperVPCIRoot.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = HyperVPCIRoot.cpp; sourceTree = "<group>"; };
 		41F2E45B26683B2C00CE26CE /* HyperVPCIRoot.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = HyperVPCIRoot.hpp; sourceTree = "<group>"; };
+		810098612779947C00076D10 /* Completion.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Completion.hpp; sourceTree = "<group>"; };
+		81009864277996B500076D10 /* Completion.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Completion.cpp; sourceTree = "<group>"; };
 		811FB7AA26F6708200145C9B /* HyperVPCIRegs.hpp */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.cpp.h; path = HyperVPCIRegs.hpp; sourceTree = "<group>"; tabWidth = 2; };
 		811FB7AB26F6708200145C9B /* HyperVPCI.cpp */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.cpp.cpp; path = HyperVPCI.cpp; sourceTree = "<group>"; tabWidth = 2; };
 		811FB7AC26F6708200145C9B /* HyperVPCI.hpp */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.cpp.h; path = HyperVPCI.hpp; sourceTree = "<group>"; tabWidth = 2; };
@@ -439,6 +443,8 @@
 				811FB7AC26F6708200145C9B /* HyperVPCI.hpp */,
 				811FB7AA26F6708200145C9B /* HyperVPCIRegs.hpp */,
 				811FB7AD26F6708200145C9B /* HyperVPCIPrivate.cpp */,
+				81009864277996B500076D10 /* Completion.cpp */,
+				810098612779947C00076D10 /* Completion.hpp */,
 			);
 			path = VirtualPCI;
 			sourceTree = "<group>";
@@ -480,6 +486,7 @@
 				418219672648607600619C15 /* HyperVKeyboard.hpp in Headers */,
 				41225F522644C34300574E86 /* HyperVVMBusDevice.hpp in Headers */,
 				41F2E40E2665B42200CE26CE /* xcore.h in Headers */,
+				810098632779947C00076D10 /* Completion.hpp in Headers */,
 				41F2E4072665B42200CE26CE /* mips.h in Headers */,
 				418F84352648B07F003F8520 /* HyperVMouse.hpp in Headers */,
 				41225F3D2642086300574E86 /* SynICProcessor.hpp in Headers */,
@@ -583,6 +590,7 @@
 				41F2E4282665B4C100CE26CE /* kern_start.cpp in Sources */,
 				418F84342648B07F003F8520 /* HyperVMouse.cpp in Sources */,
 				811FB7B226F6709000145C9B /* HyperVPCIPrivate.cpp in Sources */,
+				81009865277996B500076D10 /* Completion.cpp in Sources */,
 				419B88C5263F1F85005A9977 /* VMBus.cpp in Sources */,
 				418F052C2648451200E1D14C /* HyperVShutdown.cpp in Sources */,
 				418219662648607600619C15 /* HyperVKeyboard.cpp in Sources */,
