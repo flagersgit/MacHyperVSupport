@@ -16,8 +16,8 @@
 #define SYSLOG(str, ...) SYSLOG_PRINT("HyperVPCI-Completion", str, ## __VA_ARGS__)
 #define DBGLOG(str, ...) DBGLOG_PRINT("HyperVPCI-Completion", str, ## __VA_ARGS__)
 
-class Completion : public OSObject {
-  OSDeclareDefaultStructors(Completion);
+class HyperVCompletion : public OSObject {
+  OSDeclareDefaultStructors(HyperVCompletion);
   
 private:
   IOLock *lock;
@@ -32,7 +32,7 @@ public:
   
   void complete();
   
-  static Completion* create();
+  static HyperVCompletion* create();
 };
 
 #endif /* Completion_hpp */

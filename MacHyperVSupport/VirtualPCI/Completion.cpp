@@ -7,9 +7,9 @@
 
 #include "Completion.hpp"
 
-OSDefineMetaClassAndStructors(Completion, OSObject);
+OSDefineMetaClassAndStructors(HyperVCompletion, OSObject);
 
-bool Completion::init() {
+bool HyperVCompletion::init() {
   if (!OSObject::init()) {
     return false;
   }
@@ -26,13 +26,13 @@ bool Completion::init() {
   return true;
 }
 
-void Completion::free() {
+void HyperVCompletion::free() {
   IOLockFree(lock);
   OSObject::free();
   return;
 }
 
-void Completion::waitForCompletion() {
+void HyperVCompletion::waitForCompletion() {
   //
   // Sleep thread until completion.
   //
@@ -44,7 +44,7 @@ void Completion::waitForCompletion() {
   return;
 };
 
-void Completion::complete() {
+void HyperVCompletion::complete() {
   //
   // Wake sleeping thread.
   //
@@ -55,8 +55,8 @@ void Completion::complete() {
   return;
 }
 
-Completion* Completion::create() {
-  Completion *completion = new Completion;
+HyperVCompletion* HyperVCompletion::create() {
+  HyperVCompletion *completion = new HyperVCompletion;
   
   if (completion && !completion->init()) {
     completion->release();

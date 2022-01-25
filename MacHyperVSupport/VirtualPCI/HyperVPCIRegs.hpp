@@ -183,7 +183,7 @@ typedef struct __attribute__((packed)) {
 } HyperVPCIQueryResourceRequirementsResponse;
 
 typedef struct {
-  Completion *completion;
+  HyperVCompletion *completion;
   SInt32 status;
 } HyperVPCICompletion;
 
@@ -196,9 +196,14 @@ typedef struct {
 
 class HyperVPCIDevice;
 typedef struct {
-  Completion *completion;
+  HyperVCompletion *completion;
   HyperVPCIDevice *hvPciDevice;
 } HyperVPCIQueryResourceRequirementsCompletion;
+
+typedef struct {
+  UInt32                        deviceCount;
+  HyperVPCIFunctionDescription  funcDesc[];
+} HyperVPCIDeviceRelationsState;
 
 #define kHyperVPCIRingBufferSize (4 * PAGE_SIZE)
 

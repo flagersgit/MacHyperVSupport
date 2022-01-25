@@ -36,13 +36,9 @@ void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender,
           memcpy(responseBuffer, (UInt8*)buf + headersize, responseLength);
           hvDevice->wakeTransaction(((VMBusPacketHeader*)buf)->transactionId);
         } else {
-          DBGLOG("here");
           completionPacket = (HyperVPCIPacket*)((VMBusPacketHeader*)buf)->transactionId;
-          DBGLOG("there");
           responseBuffer = (HyperVPCIResponse*)buf;
-          DBGLOG("everywhere");
           completionPacket->completionFunc(completionPacket->completionCtx, (HyperVPCIResponse*)responseBuffer, responseLength);
-          DBGLOG("but not here");
         };
         break;
       
@@ -55,19 +51,19 @@ void HyperVPCI::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender,
           newMessage = (HyperVPCIIncomingMessage*)responseBuffer;
           switch (newMessage->messageType.type) {
             case kHyperVPCIMessageBusRelations:
-              HyperVPCIBusRelations *busRelations;
+              HyperVPCIBusRelations *busRelations = (HyperVPCIBusRelations*)buf;
               
-              busRelations = (HyperVPCIBusRelations*)buf;
-              if (busRelations->deviceCount == 0)
+              if (busRelations->deviceCount == 0) {
+                DBGLOG("no devices in bus relations");
                 break;
+              }
               
               if (responseLength < offsetof(HyperVPCIBusRelations, funcDesc) + (sizeof(HyperVPCIFunctionDescription) * (busRelations->deviceCount))) {
-                SYSLOG("bus relations too small");
+                DBGLOG("bus relations too small");
                 break;
               }
               
               pciDevicesPresent(busRelations);
-              
           }
         }
         break;
@@ -91,7 +87,7 @@ IOReturn HyperVPCI::negotiateProtocol() {
     UInt8 buffer[sizeof(HyperVPCIVersionRequest)];
   } ctx;
   
-  completion.completion = Completion::create();
+  completion.completion = HyperVCompletion::create();
   ctx.packet.completionFunc = genericCompletion;
   ctx.packet.completionCtx = &completion;
   
@@ -105,21 +101,21 @@ IOReturn HyperVPCI::negotiateProtocol() {
   
   if (ret == kIOReturnSuccess) {
     completion.completion->waitForCompletion();
+    completion.completion->release();
   } else {
-    SYSLOG("failed to request version: %d", versionRequest->protocolVersion);
+    SYSLOG("failed to send packet requesting version: %d", versionRequest->protocolVersion);
   }
   
   if (completion.status >= 0) {
     protocolVersion = (HyperVPCIProtocolVersion)versionRequest->protocolVersion;
     DBGLOG("using version: %d", protocolVersion);
-  }
-  
-  if (completion.status == kStatusRevisionMismatch) {
-    DBGLOG("unsupported protocol version (%d), attempting older version", versionRequest->protocolVersion);
-  }
-  
-  if (completion.status != kStatusRevisionMismatch) {
-    SYSLOG("failed version request: %#x", completion.status);
+  } else if (completion.status == kStatusRevisionMismatch) {
+    //DBGLOG("unsupported protocol version (%d), attempting older version", versionRequest->protocolVersion);
+    DBGLOG("unsupported protocol version (%d)", versionRequest->protocolVersion);
+    ret = kIOReturnError;
+  } else if (completion.status != kStatusRevisionMismatch) {
+    SYSLOG("failed version request with unknown error: %#x", completion.status);
+    ret = kIOReturnError;
   }
   
   return ret;
@@ -127,23 +123,67 @@ IOReturn HyperVPCI::negotiateProtocol() {
 
 void HyperVPCI::pciDevicesPresent(HyperVPCIBusRelations *busRelations) {
   DBGLOG("called");
+  HyperVPCIDeviceRelationsState  *drStateBuffer;
+  OSData *drState;
+  UInt32 drSize;
+  
+  drSize = (offsetof(HyperVPCIDeviceRelationsState, funcDesc) + (sizeof(HyperVPCIFunctionDescription) * (busRelations->deviceCount)));
+  drState = OSData::withCapacity(drSize);
+  drStateBuffer = (HyperVPCIDeviceRelationsState*)drState->getBytesNoCopy();
+  
+  drStateBuffer->deviceCount = busRelations->deviceCount;
+  if (drStateBuffer->deviceCount != 0)
+    memcpy(&drStateBuffer->funcDesc, &busRelations->funcDesc, sizeof(HyperVPCIFunctionDescription) * drStateBuffer->deviceCount);
+  
+  IOLockLock(deviceListLock);
+  deviceRelationsList->setObject(drState);
+  IOLockUnlock(deviceListLock);
+  drState->release();
+  
+  commandGate->runAction(OSMemberFunctionCast(IOCommandGate::Action, this, &HyperVPCI::dispatchPciDevicesPresent));
+}
+
+void HyperVPCI::dispatchPciDevicesPresent() {
+  HyperVPCIDeviceRelationsState  *drStateBuffer = NULL;
+  OSData *drState = NULL;
   OSCollectionIterator          *iterator;
   HyperVPCIDevice               *hvPciDevice;
   HyperVPCIFunctionDescription  *newFuncDesc;
+  HyperVCompletion                    *queryCompletion;
   bool found;
   bool needRescan = false;
+
+  IOLockLock(deviceListLock);
+  while (deviceRelationsList->getCount() != 0) {
+    drState = (OSData*)deviceRelationsList->getObject(0);
+    if (drState) {
+      drStateBuffer = (HyperVPCIDeviceRelationsState*)drState->getBytesNoCopy();
+      deviceRelationsList->removeObject(0);
+      if (deviceRelationsList->getCount() != 0) {
+        continue;
+      }
+    };
+  }
+  IOLockUnlock(deviceListLock);
+  
+  if (!drState) {
+    return;
+  }
   
   if (NULL != (iterator = OSCollectionIterator::withCollection(hvPciDevices)))
   {
+    IOLockLock(deviceListLock);
     /* mark all existing devices as reported missing */
     while (NULL != (hvPciDevice = (HyperVPCIDevice*)iterator->getNextObject()))
       hvPciDevice->reportedMissing = true;
+    IOLockUnlock(deviceListLock);
     iterator->reset();
 
     /* add back any reported devices */
-    for (UInt32 childNum = 0; childNum < busRelations->deviceCount; childNum++) {
+    for (UInt32 childNum = 0; childNum < drStateBuffer->deviceCount; childNum++) {
       found = false;
-      newFuncDesc = &busRelations->funcDesc[childNum];
+      newFuncDesc = &drStateBuffer->funcDesc[childNum];
+      IOLockLock(deviceListLock);
       while (NULL != (hvPciDevice = (HyperVPCIDevice*)iterator->getNextObject())) {
         if ((hvPciDevice->funcDesc.winSlot.slot == newFuncDesc->winSlot.slot) &&
             (hvPciDevice->funcDesc.venId == newFuncDesc->devId) &&
@@ -154,15 +194,16 @@ void HyperVPCI::pciDevicesPresent(HyperVPCIBusRelations *busRelations) {
           break;
         }
       }
+      IOLockUnlock(deviceListLock);
       iterator->reset();
       
       if (!found) {
         if (!needRescan)
           needRescan = true;
-
-//        hpdev = new_pcichild_device(hbus, new_desc);
-//        if (!hpdev)
-//          printf("vmbus_pcib: failed to add a child\n");
+        
+        if (!registerChildDevice(newFuncDesc)) {
+          SYSLOG("failed to register child device");
+        }
       }
     }
     
@@ -170,10 +211,16 @@ void HyperVPCI::pciDevicesPresent(HyperVPCIBusRelations *busRelations) {
     while (NULL != (hvPciDevice = (HyperVPCIDevice*)iterator->getNextObject()))
       if (hvPciDevice->reportedMissing == true)
         destroyChildDevice(hvPciDevice);
+    
+    queryCompletion = this->queryCompletion;
+    if (queryCompletion) {
+      this->queryCompletion = NULL;
+      queryCompletion->complete();
+    }
   
     iterator->release();
   }
-  return;
+  
 }
 
 void HyperVPCI::genericCompletion(void *ctx, HyperVPCIResponse *response, int responsePacketSize) {
@@ -193,13 +240,6 @@ IOReturn HyperVPCI::queryRelations() {
   DBGLOG("called");
   IOReturn          ret;
   HyperVPCIMessage  message;
-  IOLock           *lock;
-  
-  lock = IOLockAlloc();
-  if (lock == NULL) {
-    SYSLOG("failed to allocate lock for request");
-    return kIOReturnCannotLock;
-  };
   
   message.type = kHyperVPCIMessageQueryBusRelations;
   
@@ -226,7 +266,7 @@ HyperVPCIDevice* HyperVPCI::registerChildDevice(HyperVPCIFunctionDescription *fu
     UInt8 buffer[sizeof(HyperVPCIChildMessage)];
   } ctx;
   
-  completion.completion = Completion::create();
+  completion.completion = HyperVCompletion::create();
   ctx.packet.completionFunc = genericCompletion;
   ctx.packet.completionCtx = &completion;
   
@@ -237,12 +277,20 @@ HyperVPCIDevice* HyperVPCI::registerChildDevice(HyperVPCIFunctionDescription *fu
   ret = hvDevice->writeInbandPacketWithTransactionId(resourceRequest, sizeof(*resourceRequest), (UInt64)&ctx.packet, true);
   if (ret == kIOReturnSuccess) {
     completion.completion->waitForCompletion();
+    completion.completion->release();
   } else {
     hvPciDevice->free();
     return NULL;
   }
   
   memcpy(&hvPciDevice->funcDesc, (void*)funcDesc, sizeof(*funcDesc));
+  
+  IOLockLock(deviceListLock);
+  if (hvPciDevices->getCount() == 0) {
+    pciDomain = funcDesc->ser;
+  }
+  hvPciDevices->setObject(hvPciDevice);
+  IOLockUnlock(deviceListLock);
 
   return hvPciDevice;
 }
@@ -273,7 +321,7 @@ IOReturn HyperVPCI::enterD0() {
   } ctx;
   HyperVPCICompletion completion;
   
-  completion.completion = Completion::create();
+  completion.completion = HyperVCompletion::create();
   ctx.packet.completionFunc = genericCompletion;
   ctx.packet.completionCtx = &completion;
   
@@ -285,6 +333,7 @@ IOReturn HyperVPCI::enterD0() {
   ret = hvDevice->writeInbandPacketWithTransactionId(d0Entry, sizeof(*d0Entry), (UInt64)&ctx.packet, true);
   if (ret == kIOReturnSuccess) {
     completion.completion->waitForCompletion();
+    completion.completion->release();
   }
   
   if (completion.status < 0) {

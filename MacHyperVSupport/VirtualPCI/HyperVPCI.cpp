@@ -28,6 +28,10 @@ bool HyperVPCI::start(IOService *provider) {
   }
   hvDevice->retain();
   
+  deviceListLock = IOLockAlloc();
+  deviceRelationsList = OSArray::withCapacity(1);
+  hvPciDevices = OSArray::withCapacity(1);
+  
   IODeviceMemory *devMem = hvDevice->allocateMmio(0, PCI_CONFIG_MMIO_LENGTH, PAGE_SIZE, false);
   OSArray *devMemArr = OSArray::withCapacity(1);
   devMemArr->setObject(0, devMem);
@@ -51,6 +55,17 @@ bool HyperVPCI::start(IOService *provider) {
   getWorkLoop()->addEventSource(interruptSource);
   interruptSource->enable();
   
+  if (NULL == (queryCompletion = HyperVCompletion::create())) {
+    return false;
+  }
+  
+  workLoop = IOWorkLoop::workLoop();
+  commandGate = IOCommandGate::commandGate(this);
+  if (!workLoop || !commandGate || (workLoop->addEventSource(commandGate) != kIOReturnSuccess)) {
+    SYSLOG("failed to add commandGate");
+    return false;
+  }
+  
   //
   // Configure the channel.
   //
@@ -64,22 +79,24 @@ bool HyperVPCI::start(IOService *provider) {
     return false;
   }
   
-  if (queryRelations() != kIOReturnSuccess) {
+  if (queryRelations() == kIOReturnSuccess) {
+    queryCompletion->waitForCompletion();
+  } else {
     super::stop(provider);
     return false;
   }
   
-  if (enterD0() != kIOReturnSuccess) {
-    super::stop(provider);
-    return false;
-  }
+  //if (enterD0() != kIOReturnSuccess) {
+  //  super::stop(provider);
+  //  return false;
+  //}
   
   SYSLOG("Initialized Hyper-V Synthetic PCI Bus");
   return true;
 }
 
 #if IOPCIB_IMPL
-//bool HyperVPCI::configure(IOService *provider) {
-//  return super::configure(provider);
-//}
+bool HyperVPCI::configure(IOService *provider) {
+  return super::configure(provider);
+}
 #endif
