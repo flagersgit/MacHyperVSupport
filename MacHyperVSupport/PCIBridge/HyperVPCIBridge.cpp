@@ -10,6 +10,11 @@
 
 OSDefineMetaClassAndStructors(HyperVPCIBridge, super);
 
+extern "C" {
+  extern const int pci_fsize;
+  extern const unsigned char pci_file[];
+}
+
 bool HyperVPCIBridge::start(IOService *provider) {
   if (HVCheckOffArg()) {
     return false;
@@ -57,8 +62,15 @@ bool HyperVPCIBridge::start(IOService *provider) {
     return false;
   }
   
- 
-
+  // Allocate PCI ROM BAR.
+  HVDBGLOG("Allocating PCI ROM BAR.");
+  UInt64 fakeROMBarSize = roundup(pci_fsize, PAGE_SIZE);
+  HVDBGLOG("PCI ROM BAR Size: 0x%llX", fakeROMBarSize);
+  fakeROMBar = hvModuleDevice->allocateRange(fakeROMBarSize, PAGE_SIZE, false);
+  fakeROMBarDescriptor = IOMemoryDescriptor::withPhysicalAddress(fakeROMBar, fakeROMBarSize, static_cast<IODirection>(kIOMemoryDirectionInOut));
+  fakeROMBarMap = fakeROMBarDescriptor->map();
+  memcpy((UInt8 *)fakeROMBarMap->getAddress(), &pci_file, fakeROMBarSize);
+  HVDBGLOG("Fake ROM BAR located @ phys 0x%llX", fakeROMBar);
   
   if (!super::start(provider)) {
     return false;
@@ -194,6 +206,40 @@ bool HyperVPCIBridge::publishNub(IOPCIDevice *nub, UInt32 index) {
   nub->extendedFindPCICapability(kIOPCIMSICapability, &cap);
   msiCap = (UInt32)cap;
   HVDBGLOG("Got MSI cap pointer at 0x%X", msiCap);
+  
+  UInt8 barToReg[kHyperVPCIBarCount+1] {
+    kIOPCIConfigurationOffsetBaseAddress0,
+    kIOPCIConfigurationOffsetBaseAddress1,
+    kIOPCIConfigurationOffsetBaseAddress2,
+    kIOPCIConfigurationOffsetBaseAddress3,
+    kIOPCIConfigurationOffsetBaseAddress4,
+    kIOPCIConfigurationOffsetBaseAddress5,
+    kIOPCIConfigurationOffsetExpansionROMBase
+  };
+  IODeviceMemory::InitElement rangeList[kHyperVPCIBarCount+1];
+  
+  for (int i = 0; i < kHyperVPCIBarCount+1; i++) {
+    if (i < 6) {
+      rangeList[i] = {
+        .start = bars[i],
+        .length = barSizes[i],
+        .tag = barToReg[i]
+      };
+    } else {
+      rangeList[i] = {
+        .start = fakeROMBar,
+        .length = fakeROMBarMap->getLength(),
+        .tag = barToReg[i]
+      };
+    }
+  }
+  
+  OSArray *array = IODeviceMemory::arrayFromList(rangeList, kHyperVPCIBarCount+1);
+  if (!array)
+    return false;
+
+  nub->setDeviceMemory(array);
+  array->release();
   
   return super::publishNub(nub, index);
 }

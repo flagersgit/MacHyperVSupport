@@ -20,8 +20,6 @@ void HyperVPCIBridge::handleInterrupt(OSObject *owner, IOInterruptEventSource *s
   void *responseBuffer;
   UInt32 responseLength;
   
-  //HyperVNetworkMessage *pktComp;
-  
   while (true) {
     if (!_hvDevice->nextPacketAvailable(&type, &headersize, &totalsize)) {
       HVDBGLOG("last one");
@@ -35,27 +33,16 @@ void HyperVPCIBridge::handleInterrupt(OSObject *owner, IOInterruptEventSource *s
     switch (type) {
       case kVMBusPacketTypeDataInband:
         handleIncomingPCIMessage((HyperVPCIBridgeIncomingMessageHeader*)buf, totalsize);
-        
         _hvDevice->wakeTransaction(0);
         break;
-     // case kVMBusPacketTypeDataUsingTransferPages:
-       // handleRNDISRanges((VMBusPacketTransferPages*) buf, headersize, totalsize);
-       // break;
         
       case kVMBusPacketTypeCompletion:
-        
         if (_hvDevice->getPendingTransaction(((VMBusPacketHeader*)buf)->transactionId, &responseBuffer, &responseLength)) {
           memcpy(responseBuffer, (UInt8*)buf + headersize, responseLength);
           _hvDevice->wakeTransaction(((VMBusPacketHeader*)buf)->transactionId);
-        } else {
-          //pktComp = (HyperVNetworkMessage*) (buf + headersize);
-        //  HVDBGLOG("pkt completion status %X %X", pktComp->messageType, pktComp->v1.sendRNDISPacketComplete.status);
-          
-        ///  if (pktComp->messageType == kHyperVNetworkMessageTypeV1SendRNDISPacketComplete) {
-        //    releaseSendIndex((UInt32)(((VMBusPacketHeader*)buf)->transactionId & ~kHyperVNetworkSendTransIdBits));
-        //  }
         }
         break;
+
       default:
         break;
     }
@@ -187,6 +174,20 @@ bool HyperVPCIBridge::allocatePCIConfigWindow() {
   pciConfigMemoryMap = pciConfigMemoryDescriptor->map();
   HVDBGLOG("PCI config window located @ phys 0x%llX", pciConfigSpace);
   
+  IODeviceMemory::InitElement rangeList[1] = {{
+    .start = pciConfigSpace,
+    // Bus config window is first page, function window is second page.
+    .length = (kHyperVPCIBridgeWindowSize / 2)
+  }};
+  
+  OSArray *array = IODeviceMemory::arrayFromList(rangeList, 1);
+  if (!array)
+    return false;
+
+  _hvDevice->setDeviceMemory(array);
+  array->release();
+  //ioMemory = (IODeviceMemory *)array->getObject(0);
+  
   return true;
 }
 
@@ -304,8 +305,7 @@ UInt32 HyperVPCIBridge::readPCIConfig(UInt32 offset, UInt8 size) {
   } else if (offset >= kIOPCIConfigSubSystemVendorID && offset + size <= kIOPCIConfigExpansionROMBase) {
     memcpy(&result, ((UInt8*)&pciFunctions[0].subVendorId) + offset - kIOPCIConfigSubSystemVendorID, size);
   } else if (offset >= kIOPCIConfigExpansionROMBase && offset + size <= kIOPCIConfigCapabilitiesPtr) {
-    // Not implemented.
-    result = 0;
+    result = (UInt32)fakeROMBar;
   } else if (offset >= kIOPCIConfigInterruptLine && offset + size <= kIOPCIConfigInterruptPin) {
     // Not supported.
     result = 0;

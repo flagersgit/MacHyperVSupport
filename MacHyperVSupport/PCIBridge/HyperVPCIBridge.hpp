@@ -31,6 +31,7 @@ private:
   HyperVPCIBridgeProtocolVersion  currentPciVersion;
   
   HyperVModuleDevice  *hvModuleDevice;
+  IODeviceMemory      *ioMemory;
   IORangeScalar       pciConfigSpace;
   IOMemoryDescriptor  *pciConfigMemoryDescriptor;
   IOMemoryMap         *pciConfigMemoryMap;
@@ -44,6 +45,10 @@ private:
   
   UInt64              bars[kHyperVPCIBarCount];
   UInt64              barSizes[kHyperVPCIBarCount];
+    
+  IORangeScalar       fakeROMBar;
+  IOMemoryDescriptor  *fakeROMBarDescriptor;
+  IOMemoryMap         *fakeROMBarMap;
   
   void handleInterrupt(OSObject *owner, IOInterruptEventSource *sender, int count);
   void handleIncomingPCIMessage(HyperVPCIBridgeIncomingMessageHeader *pciMsgHeader, UInt32 msgSize);

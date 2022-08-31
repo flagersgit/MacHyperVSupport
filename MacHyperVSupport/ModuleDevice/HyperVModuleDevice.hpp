@@ -11,6 +11,8 @@
 #include <IOKit/IOService.h>
 #include <IOKit/IORangeAllocator.h>
 
+#include "HyperVModuleDevice.hpp"
+
 #include "HyperV.hpp"
 
 class HyperVModuleDevice : public IOService {
@@ -21,6 +23,7 @@ class HyperVModuleDevice : public IOService {
 private:
   IORangeAllocator *rangeAllocatorLow;
   IORangeAllocator *rangeAllocatorHigh;
+  PE_Video          consoleInfo;
   
 public:
   //
