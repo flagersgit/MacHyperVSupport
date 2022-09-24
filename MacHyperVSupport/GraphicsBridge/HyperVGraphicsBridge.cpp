@@ -51,7 +51,8 @@ bool HyperVGraphicsBridge::start(IOService *provider) {
   //
   // Locate root PCI bus instance and register ourselves.
   //
-  if (!HyperVPCIRoot::registerChildPCIBridge(this)) {
+  _busNum = HyperVPCIRoot::registerChildPCIBridge(this);
+  if (!_busNum) {
     HVSYSLOG("Failed to register with root PCI bus instance");
     OSSafeReleaseNULL(_hvDevice);
     return false;

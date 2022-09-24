@@ -22,7 +22,16 @@ inline bool HyperVPCIRoot::setConfigSpace(IOPCIAddressSpace space, UInt8 offset)
   return true;
 }
 
-bool HyperVPCIRoot::registerChildPCIBridge(IOPCIBridge *pciBridge) {
+UInt8 HyperVPCIRoot::allocateBusNum() {
+  IORangeScalar busNum;
+  bool result = false;
+  
+  result = busNumAllocator->allocate(1, &busNum, 1);
+  
+  return result ? busNum : 0;
+}
+
+UInt8 HyperVPCIRoot::registerChildPCIBridge(IOPCIBridge *pciBridge) {
   //
   // Locate root PCI bus instance.
   //
@@ -43,22 +52,20 @@ bool HyperVPCIRoot::registerChildPCIBridge(IOPCIBridge *pciBridge) {
   pciIterator->release();
   
   if (pciInstance == NULL) {
-   // HVSYSLOG("Failed to locate HyperVPCIRoot instance");
+    //HVSYSLOG("Failed to locate HyperVPCIRoot instance");
     return false;
   }
   
-  UInt8 busNum = pciBridge->firstBusNum();
-  if (busNum != pciBridge->lastBusNum()) {
-    return false;
-  }
-  
+  UInt8 busNum = pciInstance->allocateBusNum();
+
   if (pciInstance->pciBridges[busNum] != NULL) {
     return false;
   }
   
-  //HVDBGLOG("Bus %u registered", busNum);
+  
+  pciInstance->HVDBGLOG("Bus %u registered", busNum);
   pciInstance->pciBridges[busNum] = pciBridge;
-  return true;
+  return busNum;
 }
 
 bool HyperVPCIRoot::start(IOService *provider) {
@@ -69,6 +76,14 @@ bool HyperVPCIRoot::start(IOService *provider) {
   // First bridge represents ourselves and will be NULL.
   //
   memset(pciBridges, 0, sizeof (pciBridges));
+  
+  busNumAllocator = IORangeAllocator::withRange(0);
+  if (busNumAllocator == nullptr) {
+    HVSYSLOG("Unable to allocate bus number allocator");
+    OSSafeReleaseNULL(busNumAllocator);
+    return false;
+  }
+  busNumAllocator->deallocate(0x1, 0xFF);
   
   if (!super::start(provider)) {
     HVSYSLOG("Dummy PCI bridge failed to initialize");

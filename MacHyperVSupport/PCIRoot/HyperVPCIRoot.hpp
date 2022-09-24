@@ -10,6 +10,7 @@
 
 #include "HyperV.hpp"
 #include <IOKit/pci/IOPCIBridge.h>
+#include <IOKit/IORangeAllocator.h>
 
 class HyperVPCIRoot : public HV_PCIBRIDGE_CLASS {
   OSDeclareDefaultStructors(HyperVPCIRoot);
@@ -19,12 +20,15 @@ class HyperVPCIRoot : public HV_PCIBRIDGE_CLASS {
 private:
   IOSimpleLock *pciLock = NULL;
   
+  IORangeAllocator *busNumAllocator;
+  UInt8 allocateBusNum();
+  
   inline bool setConfigSpace(IOPCIAddressSpace space, UInt8 offset);
   
   IOPCIBridge *pciBridges[256] {};
   
 public:
-  static bool registerChildPCIBridge(IOPCIBridge *pciBridge);
+  static UInt8 registerChildPCIBridge(IOPCIBridge *pciBridge);
   
   //
   // IOService overrides.

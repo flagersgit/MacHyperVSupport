@@ -27,6 +27,7 @@ private:
   IOSimpleLock      *_pciLock    = nullptr;
   UInt8             _fakePCIDeviceSpace[256];
   PE_Video          _consoleInfo = { };
+  UInt8             _busNum;
 
   void fillFakePCIDeviceSpace();
 
@@ -62,12 +63,12 @@ public:
 
   UInt8 firstBusNum() APPLE_KEXT_OVERRIDE {
     HVDBGLOG("start");
-    return kHyperVPCIBusSyntheticGraphics;
+    return _busNum;
   }
 
   UInt8 lastBusNum() APPLE_KEXT_OVERRIDE {
     HVDBGLOG("start");
-    return kHyperVPCIBusSyntheticGraphics;
+    return _busNum;
   }
 };
 

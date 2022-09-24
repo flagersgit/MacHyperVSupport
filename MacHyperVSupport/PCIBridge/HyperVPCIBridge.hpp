@@ -42,6 +42,7 @@ private:
   UInt32                        pciFunctionCount = 0;
   HyperVPCIFunctionDescription  *pciFunctions = nullptr;
   
+  UInt8               busNum;
   UInt64              bars[kHyperVPCIBarCount];
   UInt64              barSizes[kHyperVPCIBarCount];
   
@@ -88,12 +89,12 @@ public:
 
   UInt8 firstBusNum() APPLE_KEXT_OVERRIDE {
     HVDBGLOG("start");
-    return 0xAA;
+    return busNum;
   }
   
   UInt8 lastBusNum() APPLE_KEXT_OVERRIDE {
     HVDBGLOG("start");
-    return 0xAA;
+    return busNum;
   }
   
   virtual bool publishNub(IOPCIDevice *nub, UInt32 index) APPLE_KEXT_OVERRIDE;
