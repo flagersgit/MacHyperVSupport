@@ -305,7 +305,10 @@ UInt32 HyperVPCIBridge::readPCIConfig(UInt32 offset, UInt8 size) {
   } else if (offset >= kIOPCIConfigSubSystemVendorID && offset + size <= kIOPCIConfigExpansionROMBase) {
     memcpy(&result, ((UInt8*)&pciFunctions[0].subVendorId) + offset - kIOPCIConfigSubSystemVendorID, size);
   } else if (offset >= kIOPCIConfigExpansionROMBase && offset + size <= kIOPCIConfigCapabilitiesPtr) {
-    result = (UInt32)fakeROMBar;
+    result = 0;
+    if (pciFunctions[0].vendorId == 0x1002 && pciFunctions[0].deviceId == 0x73ff) {
+      result = (UInt32)fakeROMBar;
+    }
   } else if (offset >= kIOPCIConfigInterruptLine && offset + size <= kIOPCIConfigInterruptPin) {
     // Not supported.
     result = 0;
