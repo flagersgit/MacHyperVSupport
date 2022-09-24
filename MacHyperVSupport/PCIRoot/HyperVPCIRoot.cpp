@@ -33,7 +33,7 @@ UInt8 HyperVPCIRoot::allocateBusNum() {
 
 void HyperVPCIRoot::deallocateBusNum(UInt8 busNum) {
   IORangeScalar start = busNum;
-  busNumAllocator->deallocate(start, 1)
+  busNumAllocator->deallocate(start, 1);
 }
 
 UInt8 HyperVPCIRoot::registerChildPCIBridge(IOPCIBridge *pciBridge) {
@@ -79,13 +79,13 @@ void HyperVPCIRoot::deregisterChildPCIBridge(IOPCIBridge *pciBridge) {
   OSDictionary *pciMatching = IOService::serviceMatching("HyperVPCIRoot");
   if (pciMatching == NULL) {
     //HVSYSLOG("Failed to create HyperVPCIRoot matching dictionary");
-    return false;
+    return;
   }
   
   OSIterator *pciIterator = IOService::getMatchingServices(pciMatching);
   if (pciIterator == NULL) {
     //HVSYSLOG("Failed to create HyperVPCIRoot matching iterator");
-    return false;
+    return;
   }
   
   pciIterator->reset();
@@ -94,7 +94,7 @@ void HyperVPCIRoot::deregisterChildPCIBridge(IOPCIBridge *pciBridge) {
   
   if (pciInstance == NULL) {
     //HVSYSLOG("Failed to locate HyperVPCIRoot instance");
-    return false;
+    return;
   }
   
   UInt8 busNum = pciBridge->firstBusNum();
