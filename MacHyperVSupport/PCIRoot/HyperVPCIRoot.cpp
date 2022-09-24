@@ -31,6 +31,11 @@ UInt8 HyperVPCIRoot::allocateBusNum() {
   return result ? busNum : 0;
 }
 
+void HyperVPCIRoot::deallocateBusNum(UInt8 busNum) {
+  IORangeScalar start = busNum;
+  busNumAllocator->deallocate(start, 1)
+}
+
 UInt8 HyperVPCIRoot::registerChildPCIBridge(IOPCIBridge *pciBridge) {
   //
   // Locate root PCI bus instance.
@@ -62,10 +67,42 @@ UInt8 HyperVPCIRoot::registerChildPCIBridge(IOPCIBridge *pciBridge) {
     return false;
   }
   
-  
   pciInstance->HVDBGLOG("Bus %u registered", busNum);
   pciInstance->pciBridges[busNum] = pciBridge;
   return busNum;
+}
+
+void HyperVPCIRoot::deregisterChildPCIBridge(IOPCIBridge *pciBridge) {
+  //
+  // Locate root PCI bus instance.
+  //
+  OSDictionary *pciMatching = IOService::serviceMatching("HyperVPCIRoot");
+  if (pciMatching == NULL) {
+    //HVSYSLOG("Failed to create HyperVPCIRoot matching dictionary");
+    return false;
+  }
+  
+  OSIterator *pciIterator = IOService::getMatchingServices(pciMatching);
+  if (pciIterator == NULL) {
+    //HVSYSLOG("Failed to create HyperVPCIRoot matching iterator");
+    return false;
+  }
+  
+  pciIterator->reset();
+  HyperVPCIRoot *pciInstance = OSDynamicCast(HyperVPCIRoot, pciIterator->getNextObject());
+  pciIterator->release();
+  
+  if (pciInstance == NULL) {
+    //HVSYSLOG("Failed to locate HyperVPCIRoot instance");
+    return false;
+  }
+  
+  UInt8 busNum = pciBridge->firstBusNum();
+  
+  pciInstance->deallocateBusNum(busNum);
+  
+  pciInstance->HVDBGLOG("Bus %u deregistered", busNum);
+  pciInstance->pciBridges[busNum] = nullptr;
 }
 
 bool HyperVPCIRoot::start(IOService *provider) {

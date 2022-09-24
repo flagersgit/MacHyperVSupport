@@ -22,6 +22,7 @@ private:
   
   IORangeAllocator *busNumAllocator;
   UInt8 allocateBusNum();
+  void deallocateBusNum(UInt8 busNum);
   
   inline bool setConfigSpace(IOPCIAddressSpace space, UInt8 offset);
   
@@ -29,6 +30,7 @@ private:
   
 public:
   static UInt8 registerChildPCIBridge(IOPCIBridge *pciBridge);
+  static void deregisterChildPCIBridge(IOPCIBridge *pciBridge);
   
   //
   // IOService overrides.
