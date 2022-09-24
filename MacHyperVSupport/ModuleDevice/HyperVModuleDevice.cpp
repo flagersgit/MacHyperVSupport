@@ -8,6 +8,9 @@
 #include "HyperVModuleDevice.hpp"
 #include "AppleACPIRange.hpp"
 
+#include <IOKit/IOPlatformExpert.h>
+#include <IOKit/IODeviceTreeSupport.h>
+
 OSDefineMetaClassAndStructors(HyperVModuleDevice, super);
 
 bool HyperVModuleDevice::start(IOService *provider) {
@@ -82,6 +85,10 @@ bool HyperVModuleDevice::start(IOService *provider) {
   // Reserve FB memory.
   // TODO: make this dynamic
   //
+  if (getPlatform()->getConsoleInfo(&consoleInfo) != kIOReturnSuccess) {
+    HVSYSLOG("Failed to get console info");
+  }
+  _rangeAllocatorLow->allocateRange(consoleInfo.v_baseAddr, (consoleInfo.v_height * consoleInfo.v_rowBytes));
   _rangeAllocatorLow->allocateRange(0x40000000, 0x4000000);
 
   HVDBGLOG("Hyper-V Module Device initialized with free size: %u bytes (low) %u bytes (high)",

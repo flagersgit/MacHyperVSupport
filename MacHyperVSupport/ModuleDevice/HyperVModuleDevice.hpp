@@ -24,6 +24,7 @@ private:
   //
   IORangeAllocator *_rangeAllocatorLow  = nullptr;
   IORangeAllocator *_rangeAllocatorHigh = nullptr;
+  PE_Video          consoleInfo;
 
 public:
   //
