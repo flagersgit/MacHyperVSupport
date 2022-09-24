@@ -31,6 +31,7 @@ private:
   HyperVPCIBridgeProtocolVersion  currentPciVersion;
   
   HyperVModuleDevice  *hvModuleDevice;
+  IODeviceMemory      *ioMemory;
   IORangeScalar       pciConfigSpace;
   IOMemoryDescriptor  *pciConfigMemoryDescriptor;
   IOMemoryMap         *pciConfigMemoryMap;
@@ -73,7 +74,7 @@ public:
   // IOPCIBridge overrides.
   //
   virtual bool configure(IOService *provider) APPLE_KEXT_OVERRIDE;
-  IODeviceMemory *ioDeviceMemory() APPLE_KEXT_OVERRIDE { HVDBGLOG("start"); return NULL; }
+  IODeviceMemory *ioDeviceMemory() APPLE_KEXT_OVERRIDE { HVDBGLOG("start"); return ioMemory; }
   UInt32 configRead32(IOPCIAddressSpace space, UInt8 offset) APPLE_KEXT_OVERRIDE;
   void configWrite32(IOPCIAddressSpace space, UInt8 offset, UInt32 data) APPLE_KEXT_OVERRIDE;
   UInt16 configRead16(IOPCIAddressSpace space, UInt8 offset) APPLE_KEXT_OVERRIDE;

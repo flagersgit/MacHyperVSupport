@@ -187,6 +187,21 @@ bool HyperVPCIBridge::allocatePCIConfigWindow() {
   pciConfigMemoryMap = pciConfigMemoryDescriptor->map();
   HVDBGLOG("PCI config window located @ phys 0x%llX", pciConfigSpace);
   
+  IODeviceMemory::InitElement rangeList[1] = {{
+    .start = pciConfigSpace,
+    // Bus config window is first page, function window is second page.
+    .length = (kHyperVPCIBridgeWindowSize / 2)
+  }};
+  
+  OSArray *array = IODeviceMemory::arrayFromList(rangeList, 1);
+  if (!array)
+    return false;
+
+  _hvDevice->setDeviceMemory(array);
+  array->release();
+  
+  ioMemory = (IODeviceMemory *)array->getObject(0);
+  
   return true;
 }
 
