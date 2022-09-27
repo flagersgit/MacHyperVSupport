@@ -209,8 +209,8 @@ bool HyperVPCIBridge::publishNub(IOPCIDevice *nub, UInt32 index) {
   for (int i = 0; i < kHyperVPCIBarCount; i++) {
     if (i < 6) {
       rangeList[i] = {
-        .start = bars[i],
-        .length = barSizes[i],
+        .start = static_cast<IOPhysicalAddress>(bars[i]),
+        .length = static_cast<IOPhysicalLength>(barSizes[i]),
         .tag = barToReg[i]
       };
     }
