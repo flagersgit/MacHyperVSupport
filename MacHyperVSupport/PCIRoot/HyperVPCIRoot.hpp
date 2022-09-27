@@ -56,11 +56,11 @@ public:
   }
 
   UInt8 firstBusNum() APPLE_KEXT_OVERRIDE {
-    return 0;
+    return 1;
   }
   
   UInt8 lastBusNum() APPLE_KEXT_OVERRIDE {
-    return 0;
+    return 0xFF - busNumAllocator->getFreeCount();
   }
 };
 

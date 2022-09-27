@@ -85,17 +85,18 @@ public:
   IOPCIAddressSpace getBridgeSpace() APPLE_KEXT_OVERRIDE {
     HVDBGLOG("start");
     IOPCIAddressSpace space = { 0 };
+    space.s.busNum = busNum;
     return space;
   }
 
   UInt8 firstBusNum() APPLE_KEXT_OVERRIDE {
     HVDBGLOG("start");
-    return busNum;
+    return 0;
   }
   
   UInt8 lastBusNum() APPLE_KEXT_OVERRIDE {
     HVDBGLOG("start");
-    return busNum;
+    return 0;
   }
   
   virtual bool publishNub(IOPCIDevice *nub, UInt32 index) APPLE_KEXT_OVERRIDE;
