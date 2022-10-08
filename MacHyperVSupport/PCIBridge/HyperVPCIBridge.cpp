@@ -196,27 +196,7 @@ bool HyperVPCIBridge::publishNub(IOPCIDevice *nub, UInt32 index) {
   msiCap = (UInt32)cap;
   HVDBGLOG("Got MSI cap pointer at 0x%X", msiCap);
   
-  UInt8 barToReg[kHyperVPCIBarCount] {
-    kIOPCIConfigurationOffsetBaseAddress0,
-    kIOPCIConfigurationOffsetBaseAddress1,
-    kIOPCIConfigurationOffsetBaseAddress2,
-    kIOPCIConfigurationOffsetBaseAddress3,
-    kIOPCIConfigurationOffsetBaseAddress4,
-    kIOPCIConfigurationOffsetBaseAddress5,
-  };
-  IODeviceMemory::InitElement rangeList[kHyperVPCIBarCount];
-  
-  for (int i = 0; i < kHyperVPCIBarCount; i++) {
-    if (i < 6) {
-      rangeList[i] = {
-        .start = static_cast<IOPhysicalAddress>(bars[i]),
-        .length = static_cast<IOPhysicalLength>(barSizes[i]),
-        .tag = barToReg[i]
-      };
-    }
-  }
-  
-  OSArray *array = IODeviceMemory::arrayFromList(rangeList, kHyperVPCIBarCount);
+  OSArray *array = IODeviceMemory::arrayFromList(iodmRangeList, iodmRangeListIdx + 1);
   if (!array)
     return false;
 

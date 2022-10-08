@@ -187,10 +187,14 @@ bool HyperVPCIBridge::allocatePCIConfigWindow() {
   pciConfigMemoryMap = pciConfigMemoryDescriptor->map();
   HVDBGLOG("PCI config window located @ phys 0x%llX", pciConfigSpace);
   
+  IOPCIAddressSpace addressSpace;
+  addressSpace.bits = 0;
+  addressSpace.s.space = kIOPCIConfigSpace;
   IODeviceMemory::InitElement rangeList[1] = {{
     .start = pciConfigSpace,
     // Bus config window is first page, function window is second page.
-    .length = (kHyperVPCIBridgeWindowSize / 2)
+    .length = (kHyperVPCIBridgeWindowSize / 2),
+    .tag = addressSpace.bits
   }};
   
   OSArray *array = IODeviceMemory::arrayFromList(rangeList, 1);
@@ -226,6 +230,15 @@ bool HyperVPCIBridge::enterPCID0() {
   return true;
 }
 
+static UInt8 barToReg[kHyperVPCIBarCount] = {
+  kIOPCIConfigBaseAddress0,
+  kIOPCIConfigBaseAddress1,
+  kIOPCIConfigBaseAddress2,
+  kIOPCIConfigBaseAddress3,
+  kIOPCIConfigBaseAddress4,
+  kIOPCIConfigBaseAddress5,
+};
+
 bool HyperVPCIBridge::queryResourceRequirements() {
   HyperVPCIBridgeChildMessage pktChild;
   pktChild.header.type = kHyperVPCIBridgeMessageTypeQueryResourceRequirements;
@@ -260,6 +273,13 @@ bool HyperVPCIBridge::queryResourceRequirements() {
       barSizes[i] = getBarSize(barVal);
       HVDBGLOG("%u-bit BAR requires 0x%llX bytes", isBar64Bit ? 64 : 32, barSizes[i]);
       bars[i] = hvModuleDevice->allocateRange(barSizes[i], barSizes[i], isBar64Bit);
+      IOPCIAddressSpace addressSpace;
+      addressSpace.bits = 0;
+      addressSpace.s.space = isBar64Bit ? kIOPCI64BitMemorySpace : kIOPCI32BitMemorySpace;
+      addressSpace.s.registerNum = barToReg[i];
+      iodmRangeList[iodmRangeListIdx].start = bars[i];
+      iodmRangeList[iodmRangeListIdx].length = barSizes[i];
+      iodmRangeList[iodmRangeListIdx].tag = addressSpace.bits;
       
       // Write BAR to device.
       writePCIConfig(kIOPCIConfigBaseAddress0 + (i * sizeof (UInt32)), sizeof (UInt32), (UInt32)bars[i]);
@@ -277,9 +297,11 @@ bool HyperVPCIBridge::queryResourceRequirements() {
       writePCIConfig(kIOPCIConfigCommand, 2, readPCIConfig(kIOPCIConfigCommand, sizeof (UInt16)) | kIOPCICommandMemorySpace);
       HVDBGLOG("New command reg %X", readPCIConfig(kIOPCIConfigCommand, sizeof (UInt16)));
       
+      iodmRangeListIdx++;
       // 64-bit BARs take two 32-bit BAR slots, so skip over the next one.
       if (isBar64Bit) {
         i++;
+        //iodmRangeListIdx--;
       }
     }
   }

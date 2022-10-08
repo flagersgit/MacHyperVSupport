@@ -43,9 +43,11 @@ private:
   UInt32                        pciFunctionCount = 0;
   HyperVPCIFunctionDescription  *pciFunctions = nullptr;
   
-  UInt8               busNum;
-  UInt64              bars[kHyperVPCIBarCount];
-  UInt64              barSizes[kHyperVPCIBarCount];
+  UInt8                       busNum;
+  UInt64                      bars[kHyperVPCIBarCount];
+  UInt64                      barSizes[kHyperVPCIBarCount];
+  IODeviceMemory::InitElement iodmRangeList[kHyperVPCIBarCount];
+  int                         iodmRangeListIdx = 0;
   
   void handleInterrupt(OSObject *owner, IOInterruptEventSource *sender, int count);
   void handleIncomingPCIMessage(HyperVPCIBridgeIncomingMessageHeader *pciMsgHeader, UInt32 msgSize);
