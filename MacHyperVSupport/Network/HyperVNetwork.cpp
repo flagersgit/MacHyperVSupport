@@ -209,8 +209,8 @@ void HyperVNetwork::receivePacket(void *pkt, UInt32 *pktSize, UInt32 timeoutMS) 
       HVDBGLOG("Interface down; waiting");
       continue;
     }
+    _hvDevice->triggerPacketAction();
     if (kdpReceiveMbuf != nullptr) {
-      _hvDevice->triggerPacketAction();
       size_t pkl = mbuf_len(kdpReceiveMbuf);
       memcpy((UInt8 *)pkt, mbuf_data(kdpReceiveMbuf), pkl);
       
