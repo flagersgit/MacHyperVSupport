@@ -207,13 +207,15 @@ void HyperVNetwork::receivePacket(void *pkt, UInt32 *pktSize, UInt32 timeoutMS) 
   while (!isReceived && costTime < timeoutMS) {
     if (!(_isNetworkEnabled && _isLinkUp)) {
       HVDBGLOG("Interface down; waiting");
-      return;
+      continue;
     }
     if (kdpReceiveMbuf != nullptr) {
+      _hvDevice->triggerPacketAction();
       size_t pkl = mbuf_len(kdpReceiveMbuf);
       memcpy((UInt8 *)pkt, mbuf_data(kdpReceiveMbuf), pkl);
       
       if (isKdpPacket((UInt8 *)pkt, pkl)) {
+        HVDBGLOG("Was a KDP packet");
         *pktSize = pkl;
         isReceived = true;
       }
