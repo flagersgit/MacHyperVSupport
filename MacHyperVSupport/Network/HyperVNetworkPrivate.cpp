@@ -374,6 +374,7 @@ void HyperVNetwork::updateLinkState(HyperVNetworkRNDISMessageIndicateStatus *ind
     _isLinkUp = linkState == kHyperVNetworkRNDISLinkStateConnected;
     if (_isLinkUp) {
       setLinkStatus(kIONetworkLinkValid | kIONetworkLinkActive, _networkMedium);
+      kdpStartup();
     } else {
       setLinkStatus(kIONetworkLinkValid, 0);
     }
@@ -420,4 +421,15 @@ void HyperVNetwork::updateLinkState(HyperVNetworkRNDISMessageIndicateStatus *ind
     default:
       break;
   }
+}
+
+void HyperVNetwork::kdpStartup() {
+  UInt32 debugArg;
+
+  if (hasDebugger || !PE_parse_boot_argn("debug", &debugArg, sizeof (debugArg)) || debugArg == 0)
+    return;
+  
+  kdpMbuf = allocatePacket(KDP_MAXPACKET);
+
+  hasDebugger = attachDebuggerClient(&kdpDebugger);
 }

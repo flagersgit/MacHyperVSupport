@@ -20,6 +20,8 @@
 
 extern "C" {
 #include <sys/kpi_mbuf.h>
+#include <net/ethernet.h>
+#include <kdp/kdp_support.h>
 }
 
 typedef struct HyperVNetworkRNDISRequest {
@@ -50,6 +52,13 @@ private:
   IOEthernetAddress            _ethAddress       = { };
   bool                         _isLinkUp         = false;
   IONetworkMedium              *_networkMedium   = nullptr;
+  //
+  // KDP support.
+  //
+  bool                          hasDebugger         = false;
+  IOKernelDebugger             *kdpDebugger         = nullptr;
+  mbuf_t                        kdpMbuf             = nullptr;
+  
 
   //
   // Receive buffer.
@@ -129,6 +138,7 @@ private:
   void createMediumDictionary();
   bool readMACAddress();
   void updateLinkState(HyperVNetworkRNDISMessageIndicateStatus *indicateStatus);
+  void kdpStartup();
   
 public:
   //
@@ -146,6 +156,12 @@ public:
   
   virtual IOReturn enable(IONetworkInterface *interface) APPLE_KEXT_OVERRIDE;
   virtual IOReturn disable(IONetworkInterface *interface) APPLE_KEXT_OVERRIDE;
+  virtual IOReturn enable(IOKernelDebugger *debugger) APPLE_KEXT_OVERRIDE;
+  virtual IOReturn disable(IOKernelDebugger *debugger) APPLE_KEXT_OVERRIDE;
+  
+  virtual void receivePacket(void *pkt, UInt32 *pktSize, UInt32 timeoutMS) APPLE_KEXT_OVERRIDE;
+  virtual void sendPacket(void *pkt, UInt32 pktSize) APPLE_KEXT_OVERRIDE;
+  
 };
 
 #endif

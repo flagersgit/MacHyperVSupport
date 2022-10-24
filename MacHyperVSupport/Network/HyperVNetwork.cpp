@@ -172,6 +172,11 @@ UInt32 HyperVNetwork::outputPacket(mbuf_t m, void *param) {
   // Packet is only to be freed on success.
   // Caller is responsible in all other cases.
   //
+  if (param != nullptr) {
+    if (*(bool *)param == false) {
+      return kIOReturnOutputSuccess;
+    }
+  }
   freePacket(m);
   return kIOReturnOutputSuccess;
 }
@@ -184,4 +189,36 @@ IOReturn HyperVNetwork::enable(IONetworkInterface *interface) {
 IOReturn HyperVNetwork::disable(IONetworkInterface *interface) {
   _isNetworkEnabled = false;
   return kIOReturnSuccess;
+}
+
+IOReturn HyperVNetwork::enable(IOKernelDebugger *debugger) {
+  _isNetworkEnabled = true;
+  return kIOReturnSuccess;
+}
+
+IOReturn HyperVNetwork::disable(IOKernelDebugger *debugger) {
+  _isNetworkEnabled = false;
+  return kIOReturnSuccess;
+}
+
+void HyperVNetwork::receivePacket(void *pkt, UInt32 *pktSize, UInt32 timeoutMS) {
+  
+}
+
+void HyperVNetwork::sendPacket(void *pkt, UInt32 pktSize) {
+  if (!(_isNetworkEnabled && _isLinkUp)) {
+    HVDBGLOG("Interface down; dropping packets");
+    return;
+  }
+
+  if (pktSize > KDP_MAXPACKET) {
+    HVDBGLOG("KDP packet too large");
+    return;
+  }
+  
+  bool shouldFree = false;
+  memcpy(mbuf_data(kdpMbuf), pkt, pktSize);
+  mbuf_setlen(kdpMbuf, pktSize);
+  
+  outputPacket(kdpMbuf, (void *)&shouldFree);
 }
