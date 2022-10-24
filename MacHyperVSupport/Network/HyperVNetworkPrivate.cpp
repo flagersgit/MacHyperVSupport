@@ -429,7 +429,41 @@ void HyperVNetwork::kdpStartup() {
   if (hasDebugger || !PE_parse_boot_argn("debug", &debugArg, sizeof (debugArg)) || debugArg == 0)
     return;
   
-  kdpMbuf = allocatePacket(KDP_MAXPACKET);
+  kdpSendMbuf = allocatePacket(KDP_MAXPACKET);
 
   hasDebugger = attachDebuggerClient(&kdpDebugger);
+}
+
+bool HyperVNetwork::isKdpPacket(UInt8 *data, UInt32 len) {
+  struct kdp_ether_header *eh = NULL;
+  struct kdp_udpiphdr aligned_ui, *ui = &aligned_ui;
+  struct kdp_ip aligned_ip, *ip = &aligned_ip;
+  unsigned int off = 0;
+
+  if (len < (sizeof (struct kdp_ether_header) + sizeof (struct kdp_udpiphdr)))
+    return false;
+
+  eh = (struct kdp_ether_header *)&data[off];
+
+  off += sizeof (struct kdp_ether_header);
+  if (ntohs(eh->ether_type) != ETHERTYPE_IP) {
+    return false;
+  }
+
+  bcopy((char *)&data[off], (char *)ui, sizeof(*ui));
+  bcopy((char *)&data[off], (char *)ip, sizeof(*ip));
+
+  if (ui->ui_pr != IPPROTO_UDP) {
+    return false;
+  }
+
+  if (ip->ip_hl > (sizeof (struct kdp_ip) >> 2)) {
+    return false;
+  }
+
+  if (ntohs(ui->ui_dport) != KDP_REMOTE_PORT) {
+    return false;
+  }
+
+  return true;
 }

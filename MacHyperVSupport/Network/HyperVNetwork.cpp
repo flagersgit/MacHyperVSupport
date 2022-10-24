@@ -202,7 +202,27 @@ IOReturn HyperVNetwork::disable(IOKernelDebugger *debugger) {
 }
 
 void HyperVNetwork::receivePacket(void *pkt, UInt32 *pktSize, UInt32 timeoutMS) {
-  
+  bool isReceived = false;
+  UInt32 costTime = 0;
+  while (!isReceived && costTime < timeoutMS) {
+    if (!(_isNetworkEnabled && _isLinkUp)) {
+      HVDBGLOG("Interface down; waiting");
+      return;
+    }
+    if (kdpReceiveMbuf != nullptr) {
+      size_t pkl = mbuf_len(kdpReceiveMbuf);
+      memcpy((UInt8 *)pkt, mbuf_data(kdpReceiveMbuf), pkl);
+      
+      if (isKdpPacket((UInt8 *)pkt, pkl)) {
+        *pktSize = pkl;
+        isReceived = true;
+      }
+    }
+    if (!isReceived) {
+      IODelay(10000);
+      costTime += 10;
+    }
+  }
 }
 
 void HyperVNetwork::sendPacket(void *pkt, UInt32 pktSize) {
@@ -217,8 +237,8 @@ void HyperVNetwork::sendPacket(void *pkt, UInt32 pktSize) {
   }
   
   bool shouldFree = false;
-  memcpy(mbuf_data(kdpMbuf), pkt, pktSize);
-  mbuf_setlen(kdpMbuf, pktSize);
+  memcpy(mbuf_data(kdpSendMbuf), pkt, pktSize);
+  mbuf_setlen(kdpSendMbuf, pktSize);
   
-  outputPacket(kdpMbuf, (void *)&shouldFree);
+  outputPacket(kdpSendMbuf, (void *)&shouldFree);
 }

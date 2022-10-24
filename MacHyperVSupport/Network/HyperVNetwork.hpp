@@ -21,6 +21,7 @@
 extern "C" {
 #include <sys/kpi_mbuf.h>
 #include <net/ethernet.h>
+#include <netinet/in.h>
 #include <kdp/kdp_support.h>
 }
 
@@ -57,7 +58,8 @@ private:
   //
   bool                          hasDebugger         = false;
   IOKernelDebugger             *kdpDebugger         = nullptr;
-  mbuf_t                        kdpMbuf             = nullptr;
+  mbuf_t                        kdpSendMbuf         = nullptr;
+  mbuf_t                        kdpReceiveMbuf      = nullptr;
   
 
   //
@@ -139,6 +141,7 @@ private:
   bool readMACAddress();
   void updateLinkState(HyperVNetworkRNDISMessageIndicateStatus *indicateStatus);
   void kdpStartup();
+  bool isKdpPacket(UInt8 *data, UInt32 len);
   
 public:
   //

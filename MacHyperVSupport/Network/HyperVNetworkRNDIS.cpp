@@ -90,6 +90,12 @@ void HyperVNetwork::processIncoming(UInt8 *data, UInt32 dataLength) {
   //memcpy(mbuf_data(newPacket), pktData, rndisPkt->dataPacket.dataLength);
   mbuf_copyback(newPacket, 0, rndisPkt->dataPacket.dataLength, pktData, MBUF_WAITOK);
   
+  if (rndisPkt->dataPacket.dataLength <= KDP_MAXPACKET && rndisPkt->dataPacket.dataLength <= KDP_MAXPACKET) {
+    kdpReceiveMbuf = newPacket;
+  } else {
+    kdpReceiveMbuf = nullptr;
+  }
+  
   _ethInterface->inputPacket(newPacket, rndisPkt->dataPacket.dataLength);
   postCycle++;
 }
