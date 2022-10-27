@@ -25,6 +25,7 @@ bool HyperVPCIBridge::start(IOService *provider) {
   }
   _hvDevice->retain();
   HVCheckDebugArgs();
+  HVDBGLOG("Initializing Hyper-V Synthetic PCI Bus");
   
   do {
     //
@@ -57,10 +58,11 @@ bool HyperVPCIBridge::start(IOService *provider) {
       break;
     }
     
-    // Negoiate protocol version and send request for functions.
+    // Negotiate protocol version and send request for functions.
     if (!negotiateProtocolVersion() || !allocatePCIConfigWindow() || !queryBusRelations() || !enterPCID0() || !queryResourceRequirements() || !sendResourcesAllocated(0)) {
       break;
     }
+    
     result = true;
   } while (false);
   
@@ -76,6 +78,53 @@ bool HyperVPCIBridge::start(IOService *provider) {
   
   HVDBGLOG("Initialized Hyper-V Synthetic PCI Bus");
   return true;
+}
+
+void HyperVPCIBridge::stop(IOService *provider) {
+  HVDBGLOG("Stopping Hyper-V Synthetic PCI Bus");
+  
+  if (pciDeviceNub != nullptr) {
+    kernelRequestProbe(pciDeviceNub, kIOPCIProbeOptionEject);
+    OSSafeReleaseNULL(pciDeviceNub);
+  }
+  
+  if (pciFunctions != nullptr) {
+    bzero(pciFunctions, pciFunctionCount * sizeof (HyperVPCIFunctionDescription));
+    IOFree(pciFunctions, pciFunctionCount * sizeof (HyperVPCIFunctionDescription));
+    pciFunctionCount = 0;
+  }
+  
+  sendResourcesReleased(0); // TODO: This needs to be variable.
+  
+  HyperVPCIBridgeMessageHeader exitD0Pkt;
+  memset(&exitD0Pkt, 0, sizeof (exitD0Pkt));
+  exitD0Pkt.type = kHyperVPCIBridgeMessageTypeBusD0Exit;
+  _hvDevice->writeInbandPacket(&exitD0Pkt, sizeof (exitD0Pkt), false);
+  
+  // Free BAR allocations.
+  for (int i = 0; i < arrsize(bars); i++) {
+    if (bars[i] != 0) {
+      hvModuleDevice->freeRange(bars[i], barSizes[i]);
+      
+      // Skip over next bar if 64-bit.
+      if (bars[i] > UINT32_MAX) {
+        i++;
+      }
+    }
+  }
+  
+  // Free PCI bridge and function window.
+  hvModuleDevice->freeRange(pciConfigSpace, kHyperVPCIBridgeWindowSize);
+  
+  
+
+  if (_hvDevice != nullptr) {
+    _hvDevice->closeVMBusChannel();
+    _hvDevice->uninstallPacketActions();
+    OSSafeReleaseNULL(_hvDevice);
+  }
+
+  super::stop(provider);
 }
 
 bool HyperVPCIBridge::configure(IOService *provider) {
@@ -210,6 +259,9 @@ bool HyperVPCIBridge::publishNub(IOPCIDevice *nub, UInt32 index) {
 
   nub->setDeviceMemory(array);
   array->release();
+  
+  pciDeviceNub = nub;
+  pciDeviceNub->retain();
   
   return super::publishNub(nub, index);
 }

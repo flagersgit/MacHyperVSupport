@@ -38,7 +38,8 @@ private:
   UInt32              msiCap;
   bool                isMsiX = false;
   bool                interruptConfigured = false;
-
+  
+  IOPCIDevice         *pciDeviceNub = nullptr;
   
   UInt32                        pciFunctionCount = 0;
   HyperVPCIFunctionDescription  *pciFunctions = nullptr;
@@ -55,10 +56,12 @@ private:
   
   bool negotiateProtocolVersion();
   bool queryBusRelations();
+  bool ejectPCIDevice();
   bool allocatePCIConfigWindow();
   bool enterPCID0();
   bool queryResourceRequirements();
   bool sendResourcesAllocated(UInt32 slot);
+  bool sendResourcesReleased(UInt32 slot);
   
   inline UInt64 getBarSize(UInt64 barValue) {
     return roundup((1 + ~(barValue & kHyperVPCIBarMemoryMask)), PAGE_SIZE);
@@ -72,6 +75,7 @@ public:
   // IOService overrides.
   //
   virtual bool start(IOService *provider) APPLE_KEXT_OVERRIDE;
+  virtual void stop(IOService *provider) APPLE_KEXT_OVERRIDE;
   
   //
   // IOPCIBridge overrides.

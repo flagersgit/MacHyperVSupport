@@ -162,14 +162,21 @@ typedef struct __attribute__((packed)) {
 } HyperVPCIBridgeQueryResourceRequirementsResponse;
 
 // Create interrupt
-typedef struct __attribute__((packed))  {
-  SInt32              status;
+typedef struct __attribute__((packed)) {
+  SInt32  status;
   UInt32  reserved2;
   UInt16  reserved;
-  UInt16 vectorCount;
+  UInt16  vectorCount;
   
   UInt32  data;
   UInt64  address;
 } HyperVPCIBridgeMessageCreateInterruptResponse;
+
+
+typedef struct __attribute__((packed)) {
+  HyperVPCIBridgeIncomingMessageHeader  header;
+  HyperVPCISlotEncoding                 slot;
+  UInt32                                status;
+} HyperVPCIBridgeMessageEjectResponse;
 
 #endif

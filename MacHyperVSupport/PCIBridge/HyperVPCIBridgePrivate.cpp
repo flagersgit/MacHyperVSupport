@@ -81,6 +81,8 @@ void HyperVPCIBridge::handleIncomingPCIMessage(HyperVPCIBridgeIncomingMessageHea
         }
       }
       break;
+    case kHyperVPCIBridgeMessageTypeEject:
+      ejectPCIDevice();
       
     default:
       break;
@@ -124,6 +126,22 @@ bool HyperVPCIBridge::queryBusRelations() {
   // need to wait for an inband bus relations packet instead.
   _hvDevice->sleepThreadZero();
   return pciFunctionCount != 0;
+}
+
+bool HyperVPCIBridge::ejectPCIDevice() {
+  HyperVPCIBridgeMessageEjectResponse pktEjectResponse;
+  pktEjectResponse.header.type = kHyperVPCIBridgeMessageTypeEjectionComplete;
+  pktEjectResponse.slot.slot = pciFunctions[0].slot.slot;
+  if (!pciDeviceNub) {
+    return false;
+  }
+  HVDBGLOG("Ejecting PCI device at slot 0x%X", pciFunctions[0].slot.slot);
+  kernelRequestProbe(pciDeviceNub, kIOPCIProbeOptionEject);
+  if (_hvDevice->writeInbandPacket(&pktEjectResponse, sizeof (pktEjectResponse), false) != kIOReturnSuccess) {
+    return false;
+  }
+  OSSafeReleaseNULL(pciDeviceNub);
+  return true;
 }
 
 bool HyperVPCIBridge::allocatePCIConfigWindow() {
@@ -254,8 +272,10 @@ bool HyperVPCIBridge::queryResourceRequirements() {
       iodmRangeList[iodmRangeListIdx].tag = addressSpace.bits;
       
       // Write BAR to device.
+      writePCIConfig(kIOPCIConfigBaseAddress0 + (i * sizeof (UInt32)), sizeof (UInt32), 0xFFFFFFFF);
       writePCIConfig(kIOPCIConfigBaseAddress0 + (i * sizeof (UInt32)), sizeof (UInt32), (UInt32)bars[i]);
       if (isBar64Bit) {
+        writePCIConfig(kIOPCIConfigBaseAddress0 + ((i + 1) * sizeof (UInt32)), sizeof (UInt32), 0xFFFFFFFF);
         writePCIConfig(kIOPCIConfigBaseAddress0 + ((i + 1) * sizeof (UInt32)), sizeof (UInt32), (UInt32)(bars[i] >> 32));
       }
       
@@ -298,7 +318,18 @@ bool HyperVPCIBridge::sendResourcesAllocated(UInt32 slot) {
   return true;
 }
 
-
+bool HyperVPCIBridge::sendResourcesReleased(UInt32 slot) {
+  HyperVPCIBridgeChildMessage pktChild;
+  memset(&pktChild, 0, sizeof (pktChild));
+  pktChild.header.type = kHyperVPCIBridgeMessageTypeResourcesReleased;
+  pktChild.slot.slot = 0; // TODO: This needs to be variable.
+  
+  if (_hvDevice->writeInbandPacket(&pktChild, sizeof (pktChild), false) != kIOReturnSuccess) {
+    return false;
+  }
+  
+  return true;
+}
 
 UInt32 HyperVPCIBridge::readPCIConfig(UInt32 offset, UInt8 size) {
   UInt32 result;
