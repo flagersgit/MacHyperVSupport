@@ -49,7 +49,8 @@ private:
   IODeviceMemory::InitElement iodmRangeList[kHyperVPCIBarCount];
   int                         iodmRangeListIdx = 0;
   
-  void handleInterrupt(OSObject *owner, IOInterruptEventSource *sender, int count);
+  bool wakePacketHandler(VMBusPacketHeader *pktHeader, UInt32 pktHeaderLength, UInt8 *pktData, UInt32 pktDataLength);
+  void handlePacket(VMBusPacketHeader *pktHeader, UInt32 pktHeaderLength, UInt8 *pktData, UInt32 pktDataLength);
   void handleIncomingPCIMessage(HyperVPCIBridgeIncomingMessageHeader *pciMsgHeader, UInt32 msgSize);
   
   bool negotiateProtocolVersion();

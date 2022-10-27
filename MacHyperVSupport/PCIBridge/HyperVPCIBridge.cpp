@@ -11,6 +11,7 @@
 OSDefineMetaClassAndStructors(HyperVPCIBridge, super);
 
 bool HyperVPCIBridge::start(IOService *provider) {
+  bool result = false;
   if (HVCheckOffArg()) {
     return false;
   }
@@ -25,48 +26,55 @@ bool HyperVPCIBridge::start(IOService *provider) {
   _hvDevice->retain();
   HVCheckDebugArgs();
   
-  //
-  // Configure interrupt.
-  //
-  interruptSource =
-    IOInterruptEventSource::interruptEventSource(this, OSMemberFunctionCast(IOInterruptEventAction, this, &HyperVPCIBridge::handleInterrupt), provider, 0);
-  getWorkLoop()->addEventSource(interruptSource);
-  interruptSource->enable();
+  do {
+    //
+    // Install packet handlers.
+    //
+    IOReturn status = _hvDevice->installPacketActions(this, OSMemberFunctionCast(HyperVVMBusDevice::PacketReadyAction, this, &HyperVPCIBridge::handlePacket), OSMemberFunctionCast(HyperVVMBusDevice::WakePacketAction, this, &HyperVPCIBridge::wakePacketHandler), kHyperVPCIBridgeResponsePacketSize);
+    if (status != kIOReturnSuccess) {
+      HVSYSLOG("Failed to install packet handlers with status 0x%X", status);
+      break;
+    }
   
-  //
-  // Configure the channel.
-  //
-  if (_hvDevice->openVMBusChannel(kHyperVPCIBridgeRingBufferSize, kHyperVPCIBridgeRingBufferSize, 0xFFFFFFFF) != kIOReturnSuccess) {
-    return false;
-  }
+    //
+    // Configure the channel.
+    //
+    if (_hvDevice->openVMBusChannel(kHyperVPCIBridgeRingBufferSize, kHyperVPCIBridgeRingBufferSize, 0xFFFFFFFF) != kIOReturnSuccess) {
+      break;
+    }
+    
+    pciLock = IOSimpleLockAlloc();
+    if (!pciLock) {
+      break;
+    }
+    
+    //
+    // Locate root PCI bus instance and register ourselves.
+    //
+    busNum = HyperVPCIRoot::registerChildPCIBridge(this);
+    if (!busNum) {
+      HVSYSLOG("Failed to register with root PCI bus instance");
+      break;
+    }
+    
+    // Negoiate protocol version and send request for functions.
+    if (!negotiateProtocolVersion() || !allocatePCIConfigWindow() || !queryBusRelations() || !enterPCID0() || !queryResourceRequirements() || !sendResourcesAllocated(0)) {
+      break;
+    }
+    result = true;
+  } while (false);
   
-  pciLock = IOSimpleLockAlloc();
-  
-  //
-  // Locate root PCI bus instance and register ourselves.
-  //
-  busNum = HyperVPCIRoot::registerChildPCIBridge(this);
-  if (!busNum) {
-    HVSYSLOG("Failed to register with root PCI bus instance");
-    _hvDevice->release();
-    return false;
-  }
-  
-  // Negoiate protocol version and send request for functions.
-  if (!negotiateProtocolVersion() || !allocatePCIConfigWindow() || !queryBusRelations() || !enterPCID0() || !queryResourceRequirements() || !sendResourcesAllocated(0)) {
+  if (!result) {
     _hvDevice->closeVMBusChannel();
-    return false;
+    _hvDevice->uninstallPacketActions();
+    OSSafeReleaseNULL(_hvDevice);
   }
-  
- 
-
   
   if (!super::start(provider)) {
     return false;
   }
   
- 
-  
+  HVDBGLOG("Initialized Hyper-V Synthetic PCI Bus");
   return true;
 }
 
