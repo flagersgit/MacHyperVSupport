@@ -79,22 +79,6 @@ bool HyperVGraphicsBridge::start(IOService *provider) {
     return false;
   }
 
-  //
-  // Add a friendly name to the child device produced.
-  //
-  OSIterator *childIterator = getChildIterator(gIOServicePlane);
-  if (childIterator != NULL) {
-    childIterator->reset();
-    
-    IOService *childService = OSDynamicCast(IOService, childIterator->getNextObject());
-    if (childService != NULL) {
-      HVDBGLOG("Found child %s", childService->getName());
-      childService->setProperty("model", "Hyper-V Graphics");
-    }
-
-    childIterator->release();
-  }
-
   do {
     //
     // Install packet handler.
@@ -262,4 +246,9 @@ void HyperVGraphicsBridge::configWrite8(IOPCIAddressSpace space, UInt8 offset, U
   _fakePCIDeviceSpace[offset] = data;
   
   IOSimpleLockUnlockEnableInterrupt(_pciLock, ints);
+}
+
+bool HyperVGraphicsBridge::publishNub(IOPCIDevice *nub, UInt32 index) {
+  nub->setProperty("model", "Hyper-V Graphics");
+  return super::publishNub(nub, index);
 }

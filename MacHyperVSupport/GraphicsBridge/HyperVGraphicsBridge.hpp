@@ -70,6 +70,8 @@ public:
     HVDBGLOG("start");
     return _busNum;
   }
+  
+  virtual bool publishNub(IOPCIDevice *nub, UInt32 index) APPLE_KEXT_OVERRIDE;
 };
 
 #endif
