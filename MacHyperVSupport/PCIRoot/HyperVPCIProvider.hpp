@@ -9,6 +9,7 @@
 #define HyperVPCIProvider_hpp
 
 #include "HyperV.hpp"
+#include <IOKit/pci/IOPCIBridge.h>
 #include <IOKit/acpi/IOACPIPlatformDevice.h>
 
 class HyperVPCIProvider : public IOACPIPlatformDevice {
@@ -22,6 +23,14 @@ public:
   //
   virtual IOService *probe(IOService *provider, SInt32 *score) APPLE_KEXT_OVERRIDE;
   virtual bool start(IOService *provider) APPLE_KEXT_OVERRIDE;
+  
+  virtual IOReturn evaluateInteger(const char *     objectName,
+                                   UInt32 *         resultInt32,
+                                   OSObject *       params[]   = 0,
+                                   IOItemCount      paramCount = 0,
+                                   IOOptionBits     options    = 0) APPLE_KEXT_OVERRIDE;
+  
+  static bool registerHotplugPCIBridge(IOPCIBridge *pciBridge);
 };
 
 #endif
