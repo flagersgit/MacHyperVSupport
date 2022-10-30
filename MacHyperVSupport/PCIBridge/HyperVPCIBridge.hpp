@@ -10,6 +10,7 @@
 
 #include <IOKit/pci/IOPCIBridge.h>
 
+#include "HyperVPCIProvider.hpp"
 #include "HyperVVMBusDevice.hpp"
 #include "HyperVPCIBridgeRegs.hpp"
 
@@ -50,8 +51,7 @@ private:
   IODeviceMemory::InitElement iodmRangeList[kHyperVPCIBarCount];
   int                         iodmRangeListIdx = 0;
   
-  bool wakePacketHandler(VMBusPacketHeader *pktHeader, UInt32 pktHeaderLength, UInt8 *pktData, UInt32 pktDataLength);
-  void handlePacket(VMBusPacketHeader *pktHeader, UInt32 pktHeaderLength, UInt8 *pktData, UInt32 pktDataLength);
+  void handleInterrupt(OSObject *owner, IOInterruptEventSource *sender, int count);
   void handleIncomingPCIMessage(HyperVPCIBridgeIncomingMessageHeader *pciMsgHeader, UInt32 msgSize);
   
   bool negotiateProtocolVersion();

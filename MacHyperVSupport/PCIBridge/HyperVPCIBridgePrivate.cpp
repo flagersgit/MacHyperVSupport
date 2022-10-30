@@ -11,28 +11,56 @@ static HyperVPCIBridgeProtocolVersion usableVersions[] = {
   kHyperVPCIBridgeProtocolVersion1
 };
 
-bool HyperVPCIBridge::wakePacketHandler(VMBusPacketHeader *pktHeader, UInt32 pktHeaderLength, UInt8 *pktData, UInt32 pktDataLength) {
-  return pktHeader->type == kVMBusPacketTypeCompletion;
-}
-
-void HyperVPCIBridge::handlePacket(VMBusPacketHeader *pktHeader, UInt32 pktHeaderLength, UInt8 *pktData, UInt32 pktDataLength) {
-  //
-  // Handle inbound packet.
-  //
-  switch (pktHeader->type) {
-    case kVMBusPacketTypeDataInband:
+void HyperVPCIBridge::handleInterrupt(OSObject *owner, IOInterruptEventSource *sender, int count) {
+  HVDBGLOG("interrupt");
+  VMBusPacketType type;
+  UInt32 headersize;
+  UInt32 totalsize;
+  
+  void *responseBuffer;
+  UInt32 responseLength;
+  
+  //HyperVNetworkMessage *pktComp;
+  
+  while (true) {
+    if (!_hvDevice->nextPacketAvailable(&type, &headersize, &totalsize)) {
+      HVDBGLOG("last one");
       break;
-      
-    case kVMBusPacketTypeDataUsingTransferPages:
-      handleIncomingPCIMessage((HyperVPCIBridgeIncomingMessageHeader*)pktData, pktDataLength);
-      _hvDevice->wakeTransaction(0);
-      break;
-      
-    case kVMBusPacketTypeCompletion:
-      break;
-    default:
-      HVSYSLOG("Invalid packet type %X", pktHeader->type);
-      break;
+    }
+    
+    UInt8 *buf = (UInt8*)IOMalloc(totalsize);
+    _hvDevice->readRawPacket((void*)buf, totalsize);
+    HVDBGLOG("got pkt %u %u", type, totalsize);
+    
+    switch (type) {
+      case kVMBusPacketTypeDataInband:
+        handleIncomingPCIMessage((HyperVPCIBridgeIncomingMessageHeader*)buf, totalsize);
+        
+        _hvDevice->wakeTransaction(0);
+        break;
+     // case kVMBusPacketTypeDataUsingTransferPages:
+       // handleRNDISRanges((VMBusPacketTransferPages*) buf, headersize, totalsize);
+       // break;
+        
+      case kVMBusPacketTypeCompletion:
+        
+        if (_hvDevice->getPendingTransaction(((VMBusPacketHeader*)buf)->transactionId, &responseBuffer, &responseLength)) {
+          memcpy(responseBuffer, (UInt8*)buf + headersize, responseLength);
+          _hvDevice->wakeTransaction(((VMBusPacketHeader*)buf)->transactionId);
+        } else {
+          //pktComp = (HyperVNetworkMessage*) (buf + headersize);
+        //  HVDBGLOG("pkt completion status %X %X", pktComp->messageType, pktComp->v1.sendRNDISPacketComplete.status);
+          
+        ///  if (pktComp->messageType == kHyperVNetworkMessageTypeV1SendRNDISPacketComplete) {
+        //    releaseSendIndex((UInt32)(((VMBusPacketHeader*)buf)->transactionId & ~kHyperVNetworkSendTransIdBits));
+        //  }
+        }
+        break;
+      default:
+        break;
+    }
+    
+    IOFree(buf, totalsize);
   }
 }
 
