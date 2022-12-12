@@ -137,4 +137,4 @@ Provides connection nub for child VMBus device modules.
 
 | Boot argument  | Description |
 |----------------|-------------|
-| -hvvmbusdebdbg | Enables debug printing in DEBUG builds
+| -hvvmbusdevdbg | Enables debug printing in DEBUG builds

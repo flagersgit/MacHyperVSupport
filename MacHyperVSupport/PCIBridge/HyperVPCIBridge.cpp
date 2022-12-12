@@ -58,7 +58,7 @@ bool HyperVPCIBridge::start(IOService *provider) {
     return false;
   }
   
-  // Negoiate protocol version and send request for functions.
+  // Negotiate protocol version and send request for functions.
   if (!negotiateProtocolVersion() || !allocatePCIConfigWindow() || !queryBusRelations() || !enterPCID0() || !queryResourceRequirements() || !sendResourcesAllocated(0)) {
     _hvDevice->closeVMBusChannel();
     return false;
